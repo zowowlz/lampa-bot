@@ -21,22 +21,23 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Состояния для ConversationHandler
+# Состояния для ConversationHandler - ВСЕ ДОЛЖНЫ БЫТЬ УНИКАЛЬНЫМИ
 WAITING_FOR_FIRST_NAME = 1
 WAITING_FOR_SURNAME = 2
-ADMIN_SELECT_USER = 1
-ADMIN_ADD_POINTS = 2
-ADMIN_CREATE_TASK = 1
-ADMIN_SET_TASK_POINTS = 2
-USER_SUBMIT_TASK = 1
-ADMIN_FIX_ID_SELECT_USER = 1
-ADMIN_FIX_ID_SET_NEW = 2
-ADMIN_REVIEW_SELECT = 1
-ADMIN_CREATE_PRODUCT_NAME = 3  # Новое состояние
-ADMIN_CREATE_PRODUCT_DESCRIPTION = 4  # Новое состояние
-ADMIN_SET_PRODUCT_PRICE = 5  # Новое состояние
-USER_BUY_PRODUCT = 1
-USER_CONFIRM_PURCHASE = 2
-ADMIN_CONFIRM_RESET = 1
+ADMIN_SELECT_USER = 3
+ADMIN_ADD_POINTS = 4
+ADMIN_CREATE_TASK = 5
+ADMIN_SET_TASK_POINTS = 6
+USER_SUBMIT_TASK = 7
+ADMIN_FIX_ID_SELECT_USER = 8
+ADMIN_FIX_ID_SET_NEW = 9
+ADMIN_REVIEW_SELECT = 10
+ADMIN_CREATE_PRODUCT_NAME = 11
+ADMIN_CREATE_PRODUCT_DESCRIPTION = 12
+ADMIN_SET_PRODUCT_PRICE = 13
+USER_BUY_PRODUCT = 14
+USER_CONFIRM_PURCHASE = 15
+ADMIN_CONFIRM_RESET = 16
 
 # Файлы для хранения данных
 DATA_FILE = 'users_data.json'
@@ -179,7 +180,13 @@ def generate_unique_id(items):
     # Находим максимальный ID и возвращаем следующий
     return max(existing_ids) + 1
 
-
+async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Тестовая команда для проверки работы бота"""
+    await update.message.reply_text(
+        "🤖 Бот работает!\n"
+        "ID пользователя: " + str(update.effective_user.id) + "\n"
+        "Админ: " + str(is_admin(update.effective_user.id))
+    )
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start"""
     user_id = update.effective_user.id
@@ -2066,7 +2073,10 @@ def main():
 
     application = Application.builder().token(TOKEN).build()
 
-    # ConversationHandler для регистрации пользователей (с раздельным вводом имени и фамилии)
+    # Добавьте тестовую команду
+    application.add_handler(CommandHandler('test', test_command))
+
+    # ConversationHandler для регистрации пользователей
     user_conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
@@ -2076,15 +2086,13 @@ def main():
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
-    # ConversationHandler для администратора (добавление товаров)
+    # ConversationHandler для администратора (добавление товаров) - УПРОЩЕННАЯ ВЕРСИЯ
     admin_product_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
         states={
-            ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_name)],
-            ADMIN_SET_PRODUCT_PRICE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_description),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)
-            ]
+            ADMIN_CREATE_PRODUCT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_name)],
+            ADMIN_CREATE_PRODUCT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_description)],
+            ADMIN_SET_PRODUCT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)]
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
@@ -2175,13 +2183,12 @@ def main():
     application.add_handler(admin_reset_conv_handler)
     application.add_handler(CallbackQueryHandler(handle_submission_callback))
     application.add_handler(CommandHandler('admin', admin_panel))
-    application.add_handler(MessageHandler(
-        filters.Regex(
-            r'^(👤 Профиль|🛍️ Магазин|📊 Рейтинг участников|📤 Отправить задание|👨‍💼 Панель администратора|👥 Список пользователей|⭐ Добавить баллы|📝 Создать задание|📋 Список заданий|📨 Проверка заданий|🛍️ Добавить товар|📦 Список товаров|🆔 Исправить ID|🗑️ Сбросить пользователей|📊 Статистика|🔙 Главное меню|🔙 Назад|🔙 Отмена|🛒 Купить товар #\d+|✅ Да, купить товар|❌ Нет, отменить|🔙 Назад к товарам)$'),
-        handle_buttons
-    ))
+    
+    # Упрощенный обработчик кнопок
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_buttons))
 
     logger.info("Бот запущен!")
+    print("🤖 Бот запускается...")  # Добавьте это для отладки
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 import os
@@ -2313,6 +2320,7 @@ def main_web():
 
     logger.info("Бот запущен на сервере Railway!")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
+
 
 
 
