@@ -13,7 +13,7 @@ import json
 import os
 from datetime import datetime
 
-# Настройка логирования
+# Настройка логирования для Railway
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
@@ -40,32 +40,36 @@ ADMIN_CONFIRM_RESET = 1
 ADMIN_DELETE_PRODUCT = 6
 ADMIN_SET_PRODUCT_QUANTITY = 7
 
-# Файлы для хранения данных
-DATA_FILE = 'users_data.json'
-TASKS_FILE = 'tasks_data.json'
-SUBMISSIONS_FILE = 'submissions_data.json'
-PRODUCTS_FILE = 'products_data.json'
-ORDERS_FILE = 'orders_data.json'
+# Файлы для хранения данных (используем абсолютные пути для Railway)
+DATA_DIR = '/data' if os.path.exists('/data') else '.'
+DATA_FILE = os.path.join(DATA_DIR, 'users_data.json')
+TASKS_FILE = os.path.join(DATA_DIR, 'tasks_data.json')
+SUBMISSIONS_FILE = os.path.join(DATA_DIR, 'submissions_data.json')
+PRODUCTS_FILE = os.path.join(DATA_DIR, 'products_data.json')
+ORDERS_FILE = os.path.join(DATA_DIR, 'orders_data.json')
 
 # ID администратора (замените на ваш Telegram ID)
 ADMIN_IDS = [424081501]  # Замените на ваш реальный ID
 
+# Токен бота из переменных окружения
+TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '8549336941:AAHUqok5bUKTypT-X8UGtXdkih8CDTNnHJ4')
+
+def ensure_data_dir():
+    """Создает директорию для данных если её нет"""
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
 
 def load_products():
     return load_data(PRODUCTS_FILE)
 
-
 def save_products(products):
     save_data(products, PRODUCTS_FILE)
-
 
 def load_orders():
     return load_data(ORDERS_FILE)
 
-
 def save_orders(orders):
     save_data(orders, ORDERS_FILE)
-
 
 def generate_product_id(products):
     """Генерация уникального ID для товара"""
@@ -87,6 +91,7 @@ def generate_product_id(products):
 def load_data(filename):
     """Загрузка данных из файла"""
     try:
+        ensure_data_dir()
         if os.path.exists(filename):
             with open(filename, 'r', encoding='utf-8') as f:
                 data = json.load(f)
@@ -96,39 +101,32 @@ def load_data(filename):
         logger.error(f"Ошибка загрузки данных из {filename}: {e}")
         return {}
 
-
 def save_data(data, filename):
     """Сохранение данных в файл"""
     try:
+        ensure_data_dir()
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
         logger.error(f"Ошибка сохранения данных в {filename}: {e}")
 
-
 def load_users():
     return load_data(DATA_FILE)
-
 
 def save_users(users):
     save_data(users, DATA_FILE)
 
-
 def load_tasks():
     return load_data(TASKS_FILE)
-
 
 def save_tasks(tasks):
     save_data(tasks, TASKS_FILE)
 
-
 def load_submissions():
     return load_data(SUBMISSIONS_FILE)
 
-
 def save_submissions(submissions):
     save_data(submissions, SUBMISSIONS_FILE)
-
 
 def get_main_keyboard(user_id=None):
     """Главная клавиатура с кнопками"""
@@ -158,7 +156,6 @@ def get_admin_keyboard():
 def is_admin(user_id):
     """Проверка, является ли пользователь администратором"""
     return user_id in ADMIN_IDS
-
 
 def generate_unique_id(items):
     """Генерация уникального ID"""
@@ -190,7 +187,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"👤 Имя: {user_data['first_name']} {user_data['surname']}\n"
             f"🆔 Ваш ID: #{user_data['unique_id']}\n\n"
             f"Используйте кнопки ниже для работы с ботом.",
-            reply_markup=get_main_keyboard(user_id)  # Передаем user_id для проверки админа
+            reply_markup=get_main_keyboard(user_id)
         )
         return ConversationHandler.END
     else:
@@ -200,7 +197,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📝 Пожалуйста, введите ваше имя:"
         )
         return WAITING_FOR_FIRST_NAME
-
 
 async def register_first_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка ввода имени при регистрации"""
@@ -226,7 +222,6 @@ async def register_first_name(update: Update, context: ContextTypes.DEFAULT_TYPE
         "Теперь введите вашу фамилию:"
     )
     return WAITING_FOR_SURNAME
-
 
 async def register_surname(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка ввода фамилии при регистрации"""
@@ -263,7 +258,7 @@ async def register_surname(update: Update, context: ContextTypes.DEFAULT_TYPE):
     users[user_id] = {
         'first_name': first_name,
         'surname': surname,
-        'name': f"{first_name} {surname}",  # Сохраняем полное имя для обратной совместимости
+        'name': f"{first_name} {surname}",
         'unique_id': unique_id,
         'points': 0,
         'registered_at': update.message.date.isoformat()
@@ -286,7 +281,6 @@ async def register_surname(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop('first_name', None)
     
     return ConversationHandler.END
-
 
 async def show_rating(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показать рейтинг участников"""
@@ -326,7 +320,6 @@ async def show_rating(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif index == 3:
             medal = "🥉 "
 
-        # Используем полное имя из отдельных полей
         user_name = f"{user_data['first_name']} {user_data['surname']}"
 
         rating_text += (
@@ -366,7 +359,6 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_data = users[user_id]
 
-    # Используем отдельные поля имени и фамилии
     profile_text = (
         "👤 <b>Ваш профиль</b>\n\n"
         f"📝 Имя: {user_data['first_name']}\n"
@@ -381,7 +373,6 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode='HTML',
         reply_markup=get_main_keyboard(update.effective_user.id)
     )
-
 
 async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показать магазин товаров"""
@@ -452,88 +443,6 @@ async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     return USER_BUY_PRODUCT
-async def submit_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Начало отправки задания"""
-    user_id = str(update.effective_user.id)
-    users = load_users()
-
-    if user_id not in users:
-        await update.message.reply_text(
-            "❌ Вы не зарегистрированы. Используйте команду /start для регистрации."
-        )
-        return ConversationHandler.END
-
-    tasks = load_tasks()
-
-    if not tasks:
-        await update.message.reply_text(
-            "📭 На данный момент активных заданий нет.",
-            reply_markup=get_main_keyboard()
-        )
-        return ConversationHandler.END
-
-    # Создаем клавиатуру с заданиями
-    keyboard = []
-    for task_id, task in tasks.items():
-        keyboard.append([KeyboardButton(f"#{task_id} - {task['description'][:30]}...")])
-
-    keyboard.append([KeyboardButton("🔙 Отмена")])
-
-    await update.message.reply_text(
-        "📋 <b>Выберите задание:</b>\n\n"
-        "Нажмите на задание, которое хотите отправить на проверку:",
-        parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    )
-
-    return USER_SUBMIT_TASK
-
-
-async def submit_task_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Завершение отправки задания"""
-    text = update.message.text
-
-    if text == "🔙 Отмена":
-        await update.message.reply_text(
-            "❌ Отправка задания отменена.",
-            reply_markup=get_main_keyboard()
-        )
-        return ConversationHandler.END
-
-    # Извлекаем ID задания из текста
-    try:
-        task_id = text.split('#')[1].split(' - ')[0]
-    except (IndexError, ValueError):
-        await update.message.reply_text(
-            "❌ Ошибка выбора задания. Попробуйте еще раз:",
-            reply_markup=get_main_keyboard()
-        )
-        return USER_SUBMIT_TASK
-
-    tasks = load_tasks()
-    if task_id not in tasks:
-        await update.message.reply_text(
-            "❌ Задание не найдено.",
-            reply_markup=get_main_keyboard()
-        )
-        return ConversationHandler.END
-
-    # Сохраняем выбранное задание
-    context.user_data['selected_task'] = task_id
-    task = tasks[task_id]
-
-    await update.message.reply_text(
-        f"📤 <b>Отправка задания:</b>\n\n"
-        f"🎯 Задание #{task_id}\n"
-        f"📝 {task['description']}\n"
-        f"⭐ Награда: {task['points']} баллов\n\n"
-        f"📎 Прикрепите файл, фото, видео или напишите текстовый ответ для отправки задания:",
-        parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
-    )
-
-    return USER_SUBMIT_TASK
-
 
 async def buy_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка выбора товара для покупки"""
@@ -620,142 +529,6 @@ async def buy_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     return USER_CONFIRM_PURCHASE
 
-
-async def confirm_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка подтверждения покупки"""
-    text = update.message.text
-
-    if text == "🔙 Назад к товарам":
-        return await shop(update, context)
-
-    if text in ["❌ Нет, отменить", "🔙 Назад"]:
-        await update.message.reply_text(
-            "❌ Покупка отменена.",
-            reply_markup=get_main_keyboard(update.effective_user.id)
-        )
-        return ConversationHandler.END
-
-    if text != "✅ Да, купить товар":
-        await update.message.reply_text(
-            "❌ Неизвестная команда. Пожалуйста, используйте кнопки для подтверждения.",
-            reply_markup=get_main_keyboard(update.effective_user.id)
-        )
-        return USER_CONFIRM_PURCHASE
-
-    # Получаем сохраненный товар из контекста
-    product = context.user_data.get('selected_product')
-    product_id = context.user_data.get('selected_product_id')
-
-    if not product or not product_id:
-        await update.message.reply_text(
-            "❌ Ошибка: товар не найден.",
-            reply_markup=get_main_keyboard(update.effective_user.id)
-        )
-        return ConversationHandler.END
-
-    user_id = str(update.effective_user.id)
-    users = load_users()
-    products = load_products()
-
-    # Обновляем данные товара (на случай изменений)
-    if product_id not in products:
-        await update.message.reply_text(
-            "❌ Товар больше не доступен.",
-            reply_markup=get_main_keyboard(update.effective_user.id)
-        )
-        return ConversationHandler.END
-
-    product = products[product_id]
-    user_data = users[user_id]
-
-    # Проверяем доступность товара еще раз
-    available = product.get('quantity', 0) == 0 or product.get('quantity', 0) > product.get('sold', 0)
-    if not available:
-        await update.message.reply_text(
-            "❌ Этот товар закончился.",
-            reply_markup=get_main_keyboard(update.effective_user.id)
-        )
-        return ConversationHandler.END
-
-    # Проверяем достаточно ли баллов
-    if user_data['points'] < product['price']:
-        await update.message.reply_text(
-            f"❌ <b>Недостаточно баллов!</b>\n\n"
-            f"💰 Стоимость товара: {product['price']} баллов\n"
-            f"💳 Ваш баланс: {user_data['points']} баллов\n"
-            f"🔻 Не хватает: {product['price'] - user_data['points']} баллов\n\n"
-            f"Пополните баланс и попробуйте снова!",
-            parse_mode='HTML',
-            reply_markup=get_main_keyboard(update.effective_user.id)
-        )
-        return ConversationHandler.END
-
-    # Списываем баллы
-    users[user_id]['points'] -= product['price']
-    save_users(users)
-
-    # Обновляем количество товара
-    if product.get('quantity', 0) > 0:
-        products[product_id]['sold'] = products[product_id].get('sold', 0) + 1
-    save_products(products)
-
-    # Создаем заказ
-    orders = load_orders()
-    order_id = generate_unique_id(orders)
-
-    orders[order_id] = {
-        'user_id': user_id,
-        'user_name': f"{user_data['first_name']} {user_data['surname']}",
-        'user_unique_id': user_data['unique_id'],
-        'product_id': product_id,
-        'product_name': product['name'],
-        'product_description': product['description'],
-        'price': product['price'],
-        'order_time': datetime.now().isoformat(),
-        'status': 'completed'
-    }
-    save_orders(orders)
-
-    # Уведомляем администраторов
-    for admin_id in ADMIN_IDS:
-        try:
-            remaining = "∞" if product.get('quantity', 0) == 0 else product.get('quantity', 0) - products[product_id][
-                'sold']
-            await context.bot.send_message(
-                chat_id=admin_id,
-                text=f"🛒 <b>Новая покупка!</b>\n\n"
-                     f"👤 <b>Покупатель:</b> {user_data['first_name']} {user_data['surname']} (ID: #{user_data['unique_id']})\n"
-                     f"🎁 <b>Товар:</b> {product['name']}\n"
-                     f"💰 <b>Цена:</b> {product['price']} баллов\n"
-                     f"📦 <b>Осталось:</b> {remaining} шт.\n"
-                     f"🆔 <b>Заказ #:</b> {order_id}\n"
-                     f"🕒 <b>Время:</b> {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-                parse_mode='HTML'
-            )
-        except Exception as e:
-            logger.error(f"Не удалось отправить уведомление администратору {admin_id}: {e}")
-
-    remaining_text = "∞" if product.get('quantity', 0) == 0 else product.get('quantity', 0) - products[product_id][
-        'sold']
-
-    await update.message.reply_text(
-        f"🎉 <b>Поздравляем с покупкой!</b>\n\n"
-        f"🎁 <b>Товар:</b> {product['name']}\n"
-        f"📝 <b>Описание:</b> {product['description']}\n"
-        f"💰 <b>Списано:</b> {product['price']} баллов\n"
-        f"💳 <b>Остаток на балансе:</b> {users[user_id]['points']} баллов\n"
-        f"📦 <b>Осталось товара:</b> {remaining_text} шт.\n"
-        f"🆔 <b>Номер заказа:</b> #{order_id}\n\n"
-        f"Спасибо за покупку! 🎊",
-        parse_mode='HTML',
-        reply_markup=get_main_keyboard(update.effective_user.id)
-    )
-
-    # Очищаем контекст
-    context.user_data.pop('selected_product', None)
-    context.user_data.pop('selected_product_id', None)
-
-    return ConversationHandler.END
 async def confirm_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка подтверждения покупки"""
     text = update.message.text
@@ -809,6 +582,12 @@ async def confirm_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
     users[user_id]['points'] -= product['price']
     save_users(users)
 
+    # Обновляем количество товара
+    products = load_products()
+    if product.get('quantity', 0) > 0:
+        products[product_id]['sold'] = products[product_id].get('sold', 0) + 1
+    save_products(products)
+
     # Создаем заказ
     orders = load_orders()
     order_id = generate_unique_id(orders)
@@ -829,12 +608,14 @@ async def confirm_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Уведомляем администраторов
     for admin_id in ADMIN_IDS:
         try:
+            remaining = "∞" if product.get('quantity', 0) == 0 else product.get('quantity', 0) - products[product_id].get('sold', 0)
             await context.bot.send_message(
                 chat_id=admin_id,
                 text=f"🛒 <b>Новая покупка!</b>\n\n"
                      f"👤 <b>Покупатель:</b> {user_data['first_name']} {user_data['surname']} (ID: #{user_data['unique_id']})\n"
                      f"🎁 <b>Товар:</b> {product['name']}\n"
                      f"💰 <b>Цена:</b> {product['price']} баллов\n"
+                     f"📦 <b>Осталось:</b> {remaining} шт.\n"
                      f"🆔 <b>Заказ #:</b> {order_id}\n"
                      f"🕒 <b>Время:</b> {datetime.now().strftime('%Y-%m-%d %H:%M')}",
                 parse_mode='HTML'
@@ -842,12 +623,15 @@ async def confirm_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error(f"Не удалось отправить уведомление администратору {admin_id}: {e}")
 
+    remaining_text = "∞" if product.get('quantity', 0) == 0 else product.get('quantity', 0) - products[product_id].get('sold', 0)
+
     await update.message.reply_text(
         f"🎉 <b>Поздравляем с покупкой!</b>\n\n"
         f"🎁 <b>Товар:</b> {product['name']}\n"
         f"📝 <b>Описание:</b> {product['description']}\n"
         f"💰 <b>Списано:</b> {product['price']} баллов\n"
         f"💳 <b>Остаток на балансе:</b> {users[user_id]['points']} баллов\n"
+        f"📦 <b>Осталось товара:</b> {remaining_text} шт.\n"
         f"🆔 <b>Номер заказа:</b> #{order_id}\n\n"
         f"Спасибо за покупку! 🎊",
         parse_mode='HTML',
@@ -859,10 +643,6 @@ async def confirm_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop('selected_product_id', None)
 
     return ConversationHandler.END
-# Убедитесь, что эти состояния есть в начале файла
-ADMIN_CREATE_PRODUCT_NAME = 1
-ADMIN_CREATE_PRODUCT_DESCRIPTION = 2
-ADMIN_CREATE_PRODUCT_PRICE = 3
 
 async def admin_create_product_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начало создания товара"""
@@ -884,7 +664,6 @@ async def admin_create_product_start(update: Update, context: ContextTypes.DEFAU
     )
 
     return ADMIN_CREATE_PRODUCT_NAME
-
 
 async def admin_create_product_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка названия товара"""
@@ -909,7 +688,6 @@ async def admin_create_product_name(update: Update, context: ContextTypes.DEFAUL
 
     return ADMIN_CREATE_PRODUCT_DESCRIPTION
 
-
 async def admin_create_product_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка описания товара"""
     text = update.message.text
@@ -933,7 +711,6 @@ async def admin_create_product_description(update: Update, context: ContextTypes
     )
 
     return ADMIN_CREATE_PRODUCT_PRICE
-
 
 async def admin_create_product_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка цены товара и запрос количества"""
@@ -972,7 +749,6 @@ async def admin_create_product_price(update: Update, context: ContextTypes.DEFAU
     )
 
     return ADMIN_SET_PRODUCT_QUANTITY
-
 
 async def admin_set_product_quantity(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Установка количества товара и сохранение"""
@@ -1018,7 +794,7 @@ async def admin_set_product_quantity(update: Update, context: ContextTypes.DEFAU
         'description': product_description,
         'price': product_price,
         'quantity': quantity,
-        'sold': 0,  # Количество проданных товаров
+        'sold': 0,
         'created_at': datetime.now().isoformat(),
         'created_by': update.effective_user.id
     }
@@ -1044,7 +820,6 @@ async def admin_set_product_quantity(update: Update, context: ContextTypes.DEFAU
     )
 
     return ConversationHandler.END
-
 
 async def admin_delete_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Удаление товара с inline кнопками"""
@@ -1081,24 +856,20 @@ async def admin_delete_product(update: Update, context: ContextTypes.DEFAULT_TYP
         reply_markup=reply_markup
     )
 
-
 async def handle_delete_product_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка callback для удаления товара"""
+    """Обработка callback'ов для удаления товара"""
     query = update.callback_query
     await query.answer()
 
-    data = query.data
-
-    if data == "delete_cancel":
+    if query.data == "delete_cancel":
         await query.edit_message_text(
             "❌ Удаление товара отменено.",
             reply_markup=get_admin_keyboard()
         )
         return
 
-    if data.startswith("delete_product_"):
-        product_id = data.split('_')[2]
-
+    if query.data.startswith("delete_product_"):
+        product_id = query.data.split('_')[2]
         products = load_products()
 
         if product_id not in products:
@@ -1109,79 +880,27 @@ async def handle_delete_product_callback(update: Update, context: ContextTypes.D
             return
 
         product = products[product_id]
-        quantity_text = "без ограничений" if product.get('quantity', 0) == 0 else f"{product.get('quantity', 0)} шт."
-
-        # Создаем клавиатуру для подтверждения удаления
-        keyboard = [
-            [
-                InlineKeyboardButton("✅ Да, удалить", callback_data=f"confirm_delete_{product_id}"),
-                InlineKeyboardButton("❌ Отменить", callback_data="delete_cancel_final")
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await query.edit_message_text(
-            f"⚠️ <b>Подтверждение удаления</b>\n\n"
-            f"📦 Товар #{product_id}\n"
-            f"🎁 Название: {product['name']}\n"
-            f"📝 Описание: {product['description']}\n"
-            f"💰 Цена: {product['price']} баллов\n"
-            f"📦 Количество: {quantity_text}\n"
-            f"🛒 Продано: {product.get('sold', 0)} шт.\n\n"
-            f"<b>Вы уверены, что хотите удалить этот товар?</b>\n"
-            f"Эта операция необратима!",
-            parse_mode='HTML',
-            reply_markup=reply_markup
-        )
-
-
-async def handle_confirm_delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка подтверждения удаления товара"""
-    query = update.callback_query
-    await query.answer()
-
-    data = query.data
-
-    if data.startswith("confirm_delete_"):
-        product_id = data.split('_')[2]
-
-        products = load_products()
-
-        if product_id not in products:
-            await query.edit_message_text(
-                "❌ Товар не найден.",
-                reply_markup=get_admin_keyboard()
-            )
-            return
-
-        product_info = products[product_id]
 
         # Удаляем товар
         del products[product_id]
         save_products(products)
 
+        quantity_text = "без ограничений" if product.get('quantity', 0) == 0 else f"{product.get('quantity', 0)} шт."
+
         await query.edit_message_text(
             f"✅ <b>Товар успешно удален!</b>\n\n"
             f"🗑️ Удален товар #{product_id}\n"
-            f"🎁 Название: {product_info['name']}\n"
-            f"💰 Цена: {product_info['price']} баллов\n\n"
-            f"Товар больше не доступен для покупки.",
-            parse_mode='HTML'
+            f"🎁 Название: {product['name']}\n"
+            f"📝 Описание: {product['description']}\n"
+            f"💰 Цена: {product['price']} баллов\n"
+            f"📦 Было в наличии: {quantity_text}\n"
+            f"🛒 Продано: {product.get('sold', 0)} шт.",
+            parse_mode='HTML',
+            reply_markup=get_admin_keyboard()
         )
 
-
-async def handle_delete_cancel_final(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка окончательной отмены удаления"""
-    query = update.callback_query
-    await query.answer()
-
-    await query.edit_message_text(
-        "❌ Удаление товара отменено.",
-        parse_mode='HTML'
-    )
-
-async def admin_products_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Список всех товаров"""
+async def admin_list_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Список всех товаров для администратора"""
     user_id = update.effective_user.id
 
     if not is_admin(user_id):
@@ -1192,24 +911,30 @@ async def admin_products_list(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if not products:
         await update.message.reply_text(
-            "📭 Товаров пока нет.",
+            "📭 В магазине нет товаров.",
             reply_markup=get_admin_keyboard()
         )
         return
 
-    products_text = "🛍️ <b>Список товаров:</b>\n\n"
+    products_text = "🛍️ <b>Список товаров</b>\n\n"
 
     for product_id, product in products.items():
         quantity_text = "∞" if product.get('quantity', 0) == 0 else f"{product.get('quantity', 0)} шт."
-        sold_text = f" | 🛒 Продано: {product.get('sold', 0)} шт." if product.get('quantity', 0) > 0 else ""
+        remaining = "∞" if product.get('quantity', 0) == 0 else product.get('quantity', 0) - product.get('sold', 0)
+        available = remaining == "∞" or remaining > 0
+
+        status_icon = "✅" if available else "❌"
+        status_text = "Доступен" if available else "Распродан"
 
         products_text += (
-            f"📦 <b>Товар #{product_id}</b>\n"
-            f"🎁 {product['name']}\n"
-            f"📝 {product['description']}\n"
+            f"{status_icon} <b>Товар #{product_id}</b> - {status_text}\n"
+            f"🎁 Название: {product['name']}\n"
+            f"📝 Описание: {product['description']}\n"
             f"💰 Цена: {product['price']} баллов\n"
-            f"📦 В наличии: {quantity_text}{sold_text}\n"
-            f"📅 Добавлен: {product.get('created_at', 'Неизвестно')[:10]}\n"
+            f"📦 Всего: {quantity_text}\n"
+            f"🛒 Продано: {product.get('sold', 0)} шт.\n"
+            f"🔢 Осталось: {remaining} шт.\n"
+            f"📅 Создан: {product.get('created_at', 'Неизвестно')}\n"
             f"────────────────────\n"
         )
 
@@ -1219,782 +944,12 @@ async def admin_products_list(update: Update, context: ContextTypes.DEFAULT_TYPE
         reply_markup=get_admin_keyboard()
     )
 
-async def admin_review_submission(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Просмотр выбранного задания для оценки"""
-    text = update.message.text
-
-    if text == "🔙 Назад":
-        # Возвращаем к списку заданий, а не сразу в меню администратора
-        return await admin_pending_submissions(update, context)
-
-    # Извлекаем ID отправки из текста
-    try:
-        submission_id = text.split('#')[1].split(' - ')[0]
-    except (IndexError, ValueError):
-        await update.message.reply_text(
-            "❌ Ошибка выбора задания. Попробуйте еще раз:",
-            reply_markup=get_admin_keyboard()
-        )
-        return ADMIN_REVIEW_SELECT
-
-    submissions = load_submissions()
-
-    if submission_id not in submissions:
-        await update.message.reply_text(
-            "❌ Отправка не найдена.",
-            reply_markup=get_admin_keyboard()
-        )
-        return ConversationHandler.END
-
-    submission = submissions[submission_id]
-
-    # Создаем клавиатуру для оценки
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("✅ Принять", callback_data=f"approve_{submission_id}"),
-            InlineKeyboardButton("❌ Отклонить", callback_data=f"reject_{submission_id}")
-        ]
-    ])
-
-    # Формируем информацию о задании
-    submission_info = (
-        f"📨 <b>Задание на проверке</b>\n\n"
-        f"👤 <b>Пользователь:</b> {submission['user_name']} (ID: #{submission['user_unique_id']})\n"
-        f"🎯 <b>Задание:</b> {submission['task_description']}\n"
-        f"⭐ <b>Баллы:</b> {submission['task_points']}\n"
-        f"📎 <b>Тип ответа:</b> {submission['content_type']}\n"
-        f"🕒 <b>Время отправки:</b> {submission['submission_time'][:16]}"
-    )
-
-    # Добавляем содержание в зависимости от типа контента
-    if submission['content_type'] == 'text' and submission['content']:
-        submission_info += f"\n\n📝 <b>Ответ:</b>\n{submission['content']}"
-    elif submission['content_type'] in ['photo', 'document', 'video'] and submission['content']:
-        submission_info += f"\n\n📎 <b>Файл:</b> {submission['content']}"
-
-    # Убираем кнопки и оставляем только "Назад"
-    back_keyboard = ReplyKeyboardMarkup([[KeyboardButton("🔙 Назад")]], resize_keyboard=True)
-
-    # Отправляем сообщение с медиа или текстом
-    if submission['content_type'] == 'photo' and submission['file_id']:
-        await context.bot.send_photo(
-            chat_id=update.effective_chat.id,
-            photo=submission['file_id'],
-            caption=submission_info,
-            parse_mode='HTML',
-            reply_markup=keyboard
-        )
-    elif submission['content_type'] == 'document' and submission['file_id']:
-        await context.bot.send_document(
-            chat_id=update.effective_chat.id,
-            document=submission['file_id'],
-            caption=submission_info,
-            parse_mode='HTML',
-            reply_markup=keyboard
-        )
-    elif submission['content_type'] == 'video' and submission['file_id']:
-        await context.bot.send_video(
-            chat_id=update.effective_chat.id,
-            video=submission['file_id'],
-            caption=submission_info,
-            parse_mode='HTML',
-            reply_markup=keyboard
-        )
-    else:
-        await update.message.reply_text(
-            submission_info,
-            parse_mode='HTML',
-            reply_markup=keyboard
-        )
-
-    # Отправляем отдельное сообщение с кнопкой "Назад"
-    await update.message.reply_text(
-        "Используйте кнопки выше для оценки задания. Кнопка 'Назад' вернет к списку заданий:",
-        reply_markup=back_keyboard
-    )
-
-    return ADMIN_REVIEW_SELECT
-
-async def handle_task_submission(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка отправленного задания"""
-    user_id = str(update.effective_user.id)
-    users = load_users()
-    tasks = load_tasks()
-
-    if user_id not in users:
-        await update.message.reply_text(
-            "❌ Вы не зарегистрированы.",
-            reply_markup=get_main_keyboard()
-        )
-        return ConversationHandler.END
-
-    task_id = context.user_data.get('selected_task')
-    if not task_id or task_id not in tasks:
-        await update.message.reply_text(
-            "❌ Ошибка: задание не выбрано.",
-            reply_markup=get_main_keyboard()
-        )
-        return ConversationHandler.END
-
-    user_data = users[user_id]
-    task = tasks[task_id]
-
-    # Сохраняем отправку задания
-    submissions = load_submissions()
-    submission_id = str(generate_unique_id(submissions))
-
-    # Определяем тип контента
-    content_type = "text"
-    content = update.message.text or ""
-    file_id = None
-
-    if update.message.photo:
-        content_type = "photo"
-        content = "Фото"
-        file_id = update.message.photo[-1].file_id
-    elif update.message.document:
-        content_type = "document"
-        content = update.message.document.file_name
-        file_id = update.message.document.file_id
-    elif update.message.video:
-        content_type = "video"
-        content = "Видео"
-        file_id = update.message.video.file_id
-
-    submissions[submission_id] = {
-        'user_id': user_id,
-        'user_name': f"{user_data['first_name']} {user_data['surname']}",
-        'user_unique_id': user_data['unique_id'],
-        'task_id': task_id,
-        'task_description': task['description'],
-        'task_points': task['points'],
-        'content_type': content_type,
-        'content': content,
-        'file_id': file_id,
-        'submission_time': datetime.now().isoformat(),
-        'status': 'pending'
-    }
-    save_submissions(submissions)
-
-    # Отправляем уведомление администраторам (БЕЗ КНОПОК)
-    for admin_id in ADMIN_IDS:
-        try:
-            admin_message = (
-                f"📨 <b>Новое задание на проверку!</b>\n\n 💡 <i>Для проверки перейдите в панель администратора → '📨 Проверка заданий'</i>"
-            )
-
-            # Отправляем сообщение с медиа или текстом БЕЗ КНОПОК
-            if content_type == "photo":
-                await context.bot.send_photo(
-                    chat_id=admin_id,
-                    photo=file_id,
-                    caption=admin_message,
-                    parse_mode='HTML'
-                )
-            elif content_type == "document":
-                await context.bot.send_document(
-                    chat_id=admin_id,
-                    document=file_id,
-                    caption=admin_message,
-                    parse_mode='HTML'
-                )
-            elif content_type == "video":
-                await context.bot.send_video(
-                    chat_id=admin_id,
-                    video=file_id,
-                    caption=admin_message,
-                    parse_mode='HTML'
-                )
-            else:
-                await context.bot.send_message(
-                    chat_id=admin_id,
-                    text=admin_message + f"\n\n📝 <b>Ответ:</b> {content}",
-                    parse_mode='HTML'
-                )
-
-        except Exception as e:
-            logger.error(f"Не удалось отправить уведомление администратору {admin_id}: {e}")
-
-    await update.message.reply_text(
-        "✅ Задание успешно отправлено на проверку!\n\n"
-        "Ожидайте решения администратора. Вы получите уведомление, когда задание будет проверено.",
-        reply_markup=get_main_keyboard()
-    )
-
-    return ConversationHandler.END
-
-async def handle_submission_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка callback от кнопок принятия/отклонения"""
-    query = update.callback_query
-    await query.answer()
-
-    data = query.data
-    submission_id = data.split('_')[1]
-    action = data.split('_')[0]
-
-    submissions = load_submissions()
-    users = load_users()
-
-    if submission_id not in submissions:
-        await query.edit_message_text("❌ Отправка не найдена.")
-        return
-
-    submission = submissions[submission_id]
-    user_id = submission['user_id']
-
-    if action == 'approve':
-        # Начисляем баллы
-        if user_id in users:
-            users[user_id]['points'] += submission['task_points']
-            save_users(users)
-
-            submission['status'] = 'approved'
-            save_submissions(submissions)
-
-            # Уведомляем пользователя
-            try:
-                await context.bot.send_message(
-                    chat_id=user_id,
-                    text=f"🎉 <b>Ваше задание принято!</b>\n\n"
-                         f"🎯 Задание: {submission['task_description']}\n"
-                         f"⭐ Начислено баллов: +{submission['task_points']}\n"
-                         f"💰 Теперь у вас: {users[user_id]['points']} баллов\n\n"
-                         f"Поздравляем! 🎊",
-                    parse_mode='HTML'
-                )
-            except Exception as e:
-                logger.error(f"Не удалось уведомить пользователя {user_id}: {e}")
-
-            # Удаляем сообщение с кнопками и показываем результат
-            await query.delete_message()
-            await context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text=f"✅ <b>Задание принято!</b>\n\n"
-                     f"👤 Пользователь: {submission['user_name']}\n"
-                     f"🎯 Задание: {submission['task_description']}\n"
-                     f"⭐ Начислено баллов: {submission['task_points']}\n"
-                     f"💰 Новый баланс: {users[user_id]['points']}",
-                parse_mode='HTML'
-            )
-
-    elif action == 'reject':
-        submission['status'] = 'rejected'
-        save_submissions(submissions)
-
-        # Уведомляем пользователя
-        try:
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=f"❌ <b>Ваше задание отклонено</b>\n\n"
-                     f"🎯 Задание: {submission['task_description']}\n"
-                     f"💡 Попробуйте выполнить задание еще раз или выберите другое задание.",
-                parse_mode='HTML'
-            )
-        except Exception as e:
-            logger.error(f"Не удалось уведомить пользователя {user_id}: {e}")
-
-        # Удаляем сообщение с кнопками и показываем результат
-        await query.delete_message()
-        await context.bot.send_message(
-            chat_id=query.message.chat_id,
-            text=f"❌ <b>Задание отклонено</b>\n\n"
-                 f"👤 Пользователь: {submission['user_name']}\n"
-                 f"🎯 Задание: {submission['task_description']}",
-            parse_mode='HTML'
-        )
-
-    # После принятия/отклонения автоматически возвращаем к списку заданий
-    await show_pending_submissions_after_review(context, query.message.chat_id)
-
-
-async def admin_create_product_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Завершение создания товара - установка описания"""
-    text = update.message.text
-
-    if text == "🔙 Отмена":
-        await update.message.reply_text(
-            "❌ Добавление товара отменено.",
-            reply_markup=get_admin_keyboard()
-        )
-        return ConversationHandler.END
-
-    # Сохраняем название товара (это первое сообщение после названия)
-    context.user_data['product_name'] = text
-
-    await update.message.reply_text(
-        f"📦 <b>Название товара:</b>\n{text}\n\n"
-        "Теперь введите описание товара:",
-        parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
-    )
-
-    return ADMIN_SET_PRODUCT_PRICE
-async def show_pending_submissions_after_review(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
-    """Показать список заданий после принятия/отклонения"""
-    submissions = load_submissions()
-    pending_subs = {k: v for k, v in submissions.items() if v['status'] == 'pending'}
-
-    if not pending_subs:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="✅ Заданий на проверке нет.",
-            reply_markup=get_admin_keyboard()
-        )
-        return
-
-    # Создаем клавиатуру с заданиями на проверке
-    keyboard = []
-    for sub_id, submission in pending_subs.items():
-        keyboard.append([KeyboardButton(
-            f"#{sub_id} - {submission['user_name']} - {submission['task_description'][:30]}..."
-        )])
-
-    keyboard.append([KeyboardButton("🔙 Назад")])
-
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text="📨 <b>Задания на проверке:</b>\n\nВыберите задание для оценки:",
-        parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    )
-
-    # После принятия/отклонения автоматически возвращаем к списку заданий
-    await admin_pending_submissions(update, context)
-
-
-async def admin_pending_submissions(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Список заданий на проверке с возможностью выбора"""
-    user_id = update.effective_user.id
-
-    if not is_admin(user_id):
-        await update.message.reply_text("❌ У вас нет доступа.")
-        return ConversationHandler.END
-
-    submissions = load_submissions()
-    pending_subs = {k: v for k, v in submissions.items() if v['status'] == 'pending'}
-
-    if not pending_subs:
-        await update.message.reply_text(
-            "✅ Заданий на проверке нет.",
-            reply_markup=get_admin_keyboard()
-        )
-        return ConversationHandler.END
-
-    # Создаем клавиатуру с заданиями на проверке
-    keyboard = []
-    for sub_id, submission in pending_subs.items():
-        keyboard.append([KeyboardButton(
-            f"#{sub_id} - {submission['user_name']} - {submission['task_description'][:30]}..."
-        )])
-
-    keyboard.append([KeyboardButton("🔙 Назад")])
-
-    await update.message.reply_text(
-        f"📨 <b>Задания на проверке:</b> {len(pending_subs)}\n\n"
-        "Выберите задание для оценки:",
-        parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    )
-
-    return ADMIN_REVIEW_SELECT
-# АДМИН ФУНКЦИИ ДЛЯ ЗАДАНИЙ
-
-async def admin_create_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Начало создания задания"""
-    user_id = update.effective_user.id
-
-    if not is_admin(user_id):
-        await update.message.reply_text("❌ У вас нет доступа.")
-        return ConversationHandler.END
-
-    await update.message.reply_text(
-        "📝 <b>Создание нового задания</b>\n\n"
-        "Введите описание задания:",
-        parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
-    )
-
-    return ADMIN_CREATE_TASK
-
-
-async def admin_create_task_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Завершение создания задания - установка баллов"""
-    text = update.message.text
-
-    if text == "🔙 Отмена":
-        await update.message.reply_text(
-            "❌ Создание задания отменено.",
-            reply_markup=get_admin_keyboard()
-        )
-        return ConversationHandler.END
-
-    # Сохраняем описание задания
-    context.user_data['task_description'] = text
-
-    await update.message.reply_text(
-        f"📝 <b>Описание задания:</b>\n{text}\n\n"
-        "Теперь введите количество баллов за выполнение этого задания:",
-        parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
-    )
-
-    return ADMIN_SET_TASK_POINTS
-
-
-async def admin_set_task_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Установка баллов для задания"""
-    text = update.message.text
-
-    if text == "🔙 Отмена":
-        await update.message.reply_text(
-            "❌ Создание задания отменено.",
-            reply_markup=get_admin_keyboard()
-        )
-        return ConversationHandler.END
-
-    try:
-        points = int(text)
-        if points <= 0:
-            await update.message.reply_text(
-                "❌ Количество баллов должно быть положительным числом. Попробуйте еще раз:"
-            )
-            return ADMIN_SET_TASK_POINTS
-    except ValueError:
-        await update.message.reply_text(
-            "❌ Пожалуйста, введите целое число. Попробуйте еще раз:"
-        )
-        return ADMIN_SET_TASK_POINTS
-
-    task_description = context.user_data.get('task_description')
-
-    # Сохраняем задание
-    tasks = load_tasks()
-    task_id = str(generate_unique_id(tasks))  # Преобразуем в строку для consistency
-
-    tasks[task_id] = {
-        'description': task_description,
-        'points': points,
-        'created_at': datetime.now().isoformat(),
-        'created_by': update.effective_user.id
-    }
-    save_tasks(tasks)
-
-    await update.message.reply_text(
-        f"✅ <b>Задание успешно создано!</b>\n\n"
-        f"🎯 Задание #{task_id}\n"
-        f"📝 Описание: {task_description}\n"
-        f"⭐ Баллы: {points}\n\n"
-        f"Теперь пользователи могут видеть это задание и отправлять его на проверку.",
-        parse_mode='HTML',
-        reply_markup=get_admin_keyboard()
-    )
-
-    return ConversationHandler.END
-
-
-async def admin_tasks_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Список всех заданий"""
-    user_id = update.effective_user.id
-
-    if not is_admin(user_id):
-        await update.message.reply_text("❌ У вас нет доступа.")
-        return
-
-    tasks = load_tasks()
-
-    if not tasks:
-        await update.message.reply_text(
-            "📭 Заданий пока нет.",
-            reply_markup=get_admin_keyboard()
-        )
-        return
-
-    tasks_text = "📋 <b>Список заданий:</b>\n\n"
-
-    for task_id, task in tasks.items():
-        tasks_text += (
-            f"🎯 <b>Задание #{task_id}</b>\n"
-            f"📝 {task['description']}\n"
-            f"⭐ Баллы: {task['points']}\n"
-            f"📅 Создано: {task.get('created_at', 'Неизвестно')[:10]}\n"
-            f"────────────────────\n"
-        )
-
-    await update.message.reply_text(
-        tasks_text,
-        parse_mode='HTML',
-        reply_markup=get_admin_keyboard()
-    )
-
-
-async def handle_submission_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка callback от кнопок принятия/отклонения"""
-    query = update.callback_query
-    await query.answer()
-
-    data = query.data
-    submission_id = data.split('_')[1]
-    action = data.split('_')[0]
-
-    submissions = load_submissions()
-    users = load_users()
-
-    if submission_id not in submissions:
-        await query.edit_message_text("❌ Отправка не найдена.")
-        return
-
-    submission = submissions[submission_id]
-    user_id = submission['user_id']
-
-    if action == 'approve':
-        # Начисляем баллы
-        if user_id in users:
-            users[user_id]['points'] += submission['task_points']
-            save_users(users)
-
-            submission['status'] = 'approved'
-            save_submissions(submissions)
-
-            # Уведомляем пользователя
-            try:
-                await context.bot.send_message(
-                    chat_id=user_id,
-                    text=f"🎉 <b>Ваше задание принято!</b>\n\n"
-                         f"🎯 Задание: {submission['task_description']}\n"
-                         f"⭐ Начислено баллов: +{submission['task_points']}\n"
-                         f"💰 Теперь у вас: {users[user_id]['points']} баллов\n\n"
-                         f"Поздравляем! 🎊",
-                    parse_mode='HTML'
-                )
-            except Exception as e:
-                logger.error(f"Не удалось уведомить пользователя {user_id}: {e}")
-
-            await query.edit_message_text(
-                f"✅ <b>Задание принято!</b>\n\n"
-                f"👤 Пользователь: {submission['user_name']}\n"
-                f"🎯 Задание: {submission['task_description']}\n"
-                f"⭐ Начислено баллов: {submission['task_points']}\n"
-                f"💰 Новый баланс: {users[user_id]['points']}",
-                parse_mode='HTML'
-            )
-
-    elif action == 'reject':
-        submission['status'] = 'rejected'
-        save_submissions(submissions)
-
-        # Уведомляем пользователя
-        try:
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=f"❌ <b>Ваше задание отклонено</b>\n\n"
-                     f"🎯 Задание: {submission['task_description']}\n"
-                     f"💡 Попробуйте выполнить задание еще раз или выберите другое задание.",
-                parse_mode='HTML'
-            )
-        except Exception as e:
-            logger.error(f"Не удалось уведомить пользователя {user_id}: {e}")
-
-        await query.edit_message_text(
-            f"❌ <b>Задание отклонено</b>\n\n"
-            f"👤 Пользователь: {submission['user_name']}\n"
-            f"🎯 Задание: {submission['task_description']}",
-            parse_mode='HTML'
-        )
-
-    # После принятия/отклонения автоматически возвращаем к списку заданий
-    await show_pending_submissions_after_review(context, update.effective_chat.id)
-
-
-async def show_pending_submissions_after_review(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
-    """Показать список заданий после принятия/отклонения"""
-    submissions = load_submissions()
-    pending_subs = {k: v for k, v in submissions.items() if v['status'] == 'pending'}
-
-    if not pending_subs:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="✅ Заданий на проверке нет.",
-            reply_markup=get_admin_keyboard()
-        )
-        return
-
-    # Создаем клавиатуру с заданиями на проверке
-    keyboard = []
-    for sub_id, submission in pending_subs.items():
-        keyboard.append([KeyboardButton(
-            f"#{sub_id} - {submission['user_name']} - {submission['task_description'][:30]}..."
-        )])
-
-    keyboard.append([KeyboardButton("🔙 Назад")])
-
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text="📨 <b>Задания на проверке:</b>\n\nВыберите задание для оценки:",
-        parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    )
-
-
-# ФУНКЦИИ ДЛЯ РЕДАКТИРОВАНИЯ ID
-
-async def admin_fix_id_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Начало процесса редактирования ID"""
-    user_id = update.effective_user.id
-
-    if not is_admin(user_id):
-        await update.message.reply_text("❌ У вас нет доступа.")
-        return ConversationHandler.END
-
-    users = load_users()
-
-    if not users:
-        await update.message.reply_text(
-            "📭 Пользователей пока нет.",
-            reply_markup=get_admin_keyboard()
-        )
-        return ConversationHandler.END
-
-    # Создаем клавиатуру с пользователями
-    keyboard = []
-    for uid, user_data in users.items():
-        keyboard.append([KeyboardButton(
-            f"#{user_data['unique_id']} - {user_data['first_name']} {user_data['surname']}"
-        )])
-
-    keyboard.append([KeyboardButton("🔙 Отмена")])
-
-    await update.message.reply_text(
-        "👥 <b>Выберите пользователя:</b>\n\n"
-        "Нажмите на пользователя, которому хотите изменить ID:",
-        parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    )
-
-    return ADMIN_FIX_ID_SELECT_USER
-
-
-async def admin_fix_id_select_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка выбора пользователя для смены ID"""
-    text = update.message.text
-
-    if text == "🔙 Отмена":
-        await update.message.reply_text(
-            "❌ Изменение ID отменено.",
-            reply_markup=get_admin_keyboard()
-        )
-        return ConversationHandler.END
-
-    # Извлекаем ID пользователя из текста
-    try:
-        user_unique_id = int(text.split('#')[1].split(' - ')[0])
-    except (IndexError, ValueError):
-        await update.message.reply_text(
-            "❌ Ошибка выбора пользователя. Попробуйте еще раз:",
-            reply_markup=get_admin_keyboard()
-        )
-        return ConversationHandler.END
-
-    users = load_users()
-    selected_user = None
-
-    for uid, user_data in users.items():
-        if user_data['unique_id'] == user_unique_id:
-            selected_user = user_data
-            selected_user['telegram_id'] = uid
-            break
-
-    if not selected_user:
-        await update.message.reply_text(
-            "❌ Пользователь не найден.",
-            reply_markup=get_admin_keyboard()
-        )
-        return ConversationHandler.END
-
-    # Сохраняем выбранного пользователя в контексте
-    context.user_data['selected_user'] = selected_user
-
-    await update.message.reply_text(
-        f"👤 <b>Выбран пользователь:</b>\n\n"
-        f"📝 Имя: {selected_user['first_name']}\n"
-        f"📝 Фамилия: {selected_user['surname']}\n"
-        f"🆔 Текущий ID: #{selected_user['unique_id']}\n\n"
-        "Введите новый ID (только число):",
-        parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
-    )
-
-    return ADMIN_FIX_ID_SET_NEW
-
-
-async def admin_fix_id_set_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Установка нового ID для пользователя"""
-    text = update.message.text
-
-    if text == "🔙 Отмена":
-        await update.message.reply_text(
-            "❌ Изменение ID отменено.",
-            reply_markup=get_admin_keyboard()
-        )
-        return ConversationHandler.END
-
-    try:
-        new_id = int(text)
-        if new_id <= 0:
-            await update.message.reply_text(
-                "❌ ID должен быть положительным числом. Попробуйте еще раз:"
-            )
-            return ADMIN_FIX_ID_SET_NEW
-    except ValueError:
-        await update.message.reply_text(
-            "❌ Пожалуйста, введите целое число. Попробуйте еще раз:"
-        )
-        return ADMIN_FIX_ID_SET_NEW
-
-    selected_user = context.user_data.get('selected_user')
-    if not selected_user:
-        await update.message.reply_text(
-            "❌ Ошибка: пользователь не выбран.",
-            reply_markup=get_admin_keyboard()
-        )
-        return ConversationHandler.END
-
-    users = load_users()
-
-    # Проверяем, не занят ли новый ID другим пользователем
-    for uid, user_data in users.items():
-        if user_data['unique_id'] == new_id and uid != selected_user['telegram_id']:
-            await update.message.reply_text(
-                f"❌ ID #{new_id} уже занят пользователем {user_data['first_name']} {user_data['surname']}.\n"
-                f"Пожалуйста, выберите другой ID:",
-                reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
-            )
-            return ADMIN_FIX_ID_SET_NEW
-
-    # Обновляем ID пользователя
-    old_id = selected_user['unique_id']
-    users[selected_user['telegram_id']]['unique_id'] = new_id
-    save_users(users)
-
-    await update.message.reply_text(
-        f"✅ <b>ID успешно изменен!</b>\n\n"
-        f"👤 Пользователь: {selected_user['first_name']} {selected_user['surname']}\n"
-        f"🆔 Старый ID: #{old_id}\n"
-        f"🆕 Новый ID: #{new_id}",
-        parse_mode='HTML',
-        reply_markup=get_admin_keyboard()
-    )
-
-    return ConversationHandler.END
-
-
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Панель администратора"""
     user_id = update.effective_user.id
 
     if not is_admin(user_id):
-        await update.message.reply_text(
-            "❌ У вас нет доступа к этой команде."
-        )
+        await update.message.reply_text("❌ У вас нет доступа к панели администратора.")
         return
 
     await update.message.reply_text(
@@ -2004,9 +959,8 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=get_admin_keyboard()
     )
 
-
-async def admin_users_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Список всех пользователей"""
+async def admin_list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Список пользователей для администратора"""
     user_id = update.effective_user.id
 
     if not is_admin(user_id):
@@ -2017,31 +971,31 @@ async def admin_users_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not users:
         await update.message.reply_text(
-            "📭 Пользователей пока нет.",
+            "📭 Пользователей нет.",
             reply_markup=get_admin_keyboard()
         )
         return
 
-    users_list = "👥 <b>Список пользователей:</b>\n\n"
+    users_text = "👥 <b>Список пользователей</b>\n\n"
 
-    for uid, user_data in users.items():
-        users_list += (
-            f"👤 {user_data['first_name']} {user_data['surname']}\n"
+    for telegram_id, user_data in users.items():
+        users_text += (
             f"🆔 ID: #{user_data['unique_id']}\n"
+            f"👤 Имя: {user_data['first_name']} {user_data['surname']}\n"
             f"⭐ Баллы: {user_data['points']}\n"
-            f"📅 Регистрация: {user_data.get('registered_at', 'Неизвестно')[:10]}\n"
+            f"📅 Зарегистрирован: {user_data.get('registered_at', 'Неизвестно')}\n"
+            f"🔗 Telegram ID: {telegram_id}\n"
             f"────────────────────\n"
         )
 
     await update.message.reply_text(
-        users_list,
+        users_text,
         parse_mode='HTML',
         reply_markup=get_admin_keyboard()
     )
 
-
 async def admin_add_points_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Начало процесса добавления баллов"""
+    """Начало добавления баллов"""
     user_id = update.effective_user.id
 
     if not is_admin(user_id):
@@ -2052,32 +1006,30 @@ async def admin_add_points_start(update: Update, context: ContextTypes.DEFAULT_T
 
     if not users:
         await update.message.reply_text(
-            "📭 Пользователей пока нет.",
+            "📭 Пользователей нет.",
             reply_markup=get_admin_keyboard()
         )
         return ConversationHandler.END
 
     # Создаем клавиатуру с пользователями
     keyboard = []
-    for uid, user_data in users.items():
-        keyboard.append([KeyboardButton(
-            f"#{user_data['unique_id']} - {user_data['first_name']} {user_data['surname']} ({user_data['points']} баллов)"
-        )])
+    for telegram_id, user_data in users.items():
+        button_text = f"#{user_data['unique_id']} - {user_data['first_name']} {user_data['surname']} ({user_data['points']} баллов)"
+        keyboard.append([KeyboardButton(button_text)])
 
     keyboard.append([KeyboardButton("🔙 Отмена")])
 
     await update.message.reply_text(
-        "👥 <b>Выберите пользователя:</b>\n\n"
-        "Нажмите на пользователя, которому хотите добавить баллы:",
+        "⭐ <b>Добавление баллов</b>\n\n"
+        "Выберите пользователя:",
         parse_mode='HTML',
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
 
     return ADMIN_SELECT_USER
 
-
 async def admin_select_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка выбора пользователя"""
+    """Выбор пользователя для добавления баллов"""
     text = update.message.text
 
     if text == "🔙 Отмена":
@@ -2089,49 +1041,50 @@ async def admin_select_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Извлекаем ID пользователя из текста
     try:
-        user_unique_id = int(text.split('#')[1].split(' - ')[0])
+        unique_id = int(text.split('#')[1].split(' ')[0])
     except (IndexError, ValueError):
         await update.message.reply_text(
-            "❌ Ошибка выбора пользователя. Попробуйте еще раз:",
-            reply_markup=get_admin_keyboard()
+            "❌ Ошибка выбора пользователя. Попробуйте еще раз:"
         )
-        return ConversationHandler.END
+        return ADMIN_SELECT_USER
 
     users = load_users()
-    selected_user = None
 
-    for uid, user_data in users.items():
-        if user_data['unique_id'] == user_unique_id:
+    # Находим пользователя по unique_id
+    selected_user = None
+    selected_user_id = None
+
+    for telegram_id, user_data in users.items():
+        if user_data['unique_id'] == unique_id:
             selected_user = user_data
-            selected_user['telegram_id'] = uid
+            selected_user_id = telegram_id
             break
 
     if not selected_user:
         await update.message.reply_text(
-            "❌ Пользователь не найден.",
-            reply_markup=get_admin_keyboard()
+            "❌ Пользователь не найден. Попробуйте еще раз:"
         )
-        return ConversationHandler.END
+        return ADMIN_SELECT_USER
 
     # Сохраняем выбранного пользователя в контексте
-    context.user_data['selected_user'] = selected_user
+    context.user_data['selected_user_id'] = selected_user_id
+    context.user_data['selected_user_name'] = f"{selected_user['first_name']} {selected_user['surname']}"
+    context.user_data['selected_user_unique_id'] = unique_id
 
     await update.message.reply_text(
         f"👤 <b>Выбран пользователь:</b>\n\n"
-        f"📝 Имя: {selected_user['first_name']}\n"
-        f"📝 Фамилия: {selected_user['surname']}\n"
-        f"🆔 ID: #{selected_user['unique_id']}\n"
+        f"🆔 ID: #{unique_id}\n"
+        f"👤 Имя: {selected_user['first_name']} {selected_user['surname']}\n"
         f"⭐ Текущие баллы: {selected_user['points']}\n\n"
-        "Введите количество баллов для добавления:",
+        f"Введите количество баллов для добавления:",
         parse_mode='HTML',
         reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
     )
 
     return ADMIN_ADD_POINTS
 
-
-async def admin_add_points_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Завершение добавления баллов"""
+async def admin_add_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Добавление баллов пользователю"""
     text = update.message.text
 
     if text == "🔙 Отмена":
@@ -2154,95 +1107,554 @@ async def admin_add_points_finish(update: Update, context: ContextTypes.DEFAULT_
         )
         return ADMIN_ADD_POINTS
 
-    selected_user = context.user_data.get('selected_user')
-    if not selected_user:
+    selected_user_id = context.user_data.get('selected_user_id')
+    selected_user_name = context.user_data.get('selected_user_name')
+    selected_user_unique_id = context.user_data.get('selected_user_unique_id')
+
+    if not selected_user_id:
         await update.message.reply_text(
-            "❌ Ошибка: пользователь не выбран.",
+            "❌ Ошибка: пользователь не найден. Начните заново.",
             reply_markup=get_admin_keyboard()
         )
         return ConversationHandler.END
 
     users = load_users()
-    telegram_id = selected_user['telegram_id']
 
-    if telegram_id in users:
-        users[telegram_id]['points'] += points
-        save_users(users)
-
-        new_points = users[telegram_id]['points']
-
-        await update.message.reply_text(
-            f"✅ <b>Баллы успешно добавлены!</b>\n\n"
-            f"👤 Пользователь: {selected_user['first_name']} {selected_user['surname']}\n"
-            f"🆔 ID: #{selected_user['unique_id']}\n"
-            f"⭐ Добавлено баллов: +{points}\n"
-            f"💰 Новый баланс: {new_points}",
-            parse_mode='HTML',
-            reply_markup=get_admin_keyboard()
-        )
-
-        # Оповещаем пользователя о начислении баллов
-        try:
-            await context.bot.send_message(
-                chat_id=telegram_id,
-                text=f"🎉 <b>Вам начислены баллы!</b>\n\n"
-                     f"⭐ Добавлено: +{points} баллов\n"
-                     f"💰 Теперь у вас: {new_points} баллов\n\n"
-                     f"Спасибо за участие!",
-                parse_mode='HTML'
-            )
-        except Exception as e:
-            logger.error(f"Не удалось отправить уведомление пользователю {telegram_id}: {e}")
-
-    else:
+    if selected_user_id not in users:
         await update.message.reply_text(
             "❌ Пользователь не найден в базе данных.",
             reply_markup=get_admin_keyboard()
         )
+        return ConversationHandler.END
+
+    # Добавляем баллы
+    users[selected_user_id]['points'] += points
+    save_users(users)
+
+    # Очищаем контекст
+    context.user_data.pop('selected_user_id', None)
+    context.user_data.pop('selected_user_name', None)
+    context.user_data.pop('selected_user_unique_id', None)
+
+    await update.message.reply_text(
+        f"✅ <b>Баллы успешно добавлены!</b>\n\n"
+        f"👤 Пользователь: {selected_user_name}\n"
+        f"🆔 ID: #{selected_user_unique_id}\n"
+        f"⭐ Добавлено: {points} баллов\n"
+        f"💰 Новый баланс: {users[selected_user_id]['points']} баллов",
+        parse_mode='HTML',
+        reply_markup=get_admin_keyboard()
+    )
 
     return ConversationHandler.END
 
+async def admin_create_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Начало создания задания"""
+    user_id = update.effective_user.id
 
-async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Статистика для администратора"""
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ У вас нет доступа.")
+        return ConversationHandler.END
+
+    await update.message.reply_text(
+        "📝 <b>Создание нового задания</b>\n\n"
+        "Введите название задания:",
+        parse_mode='HTML',
+        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
+    )
+
+    return ADMIN_CREATE_TASK
+
+async def admin_create_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка названия задания"""
+    text = update.message.text
+
+    if text == "🔙 Отмена":
+        await update.message.reply_text(
+            "❌ Создание задания отменено.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
+
+    # Сохраняем название задания
+    context.user_data['task_name'] = text
+
+    await update.message.reply_text(
+        f"📝 <b>Название задания:</b> {text}\n\n"
+        "Теперь введите количество баллов за выполнение задания:",
+        parse_mode='HTML',
+        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
+    )
+
+    return ADMIN_SET_TASK_POINTS
+
+async def admin_set_task_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка баллов за задание и сохранение"""
+    text = update.message.text
+
+    if text == "🔙 Отмена":
+        await update.message.reply_text(
+            "❌ Создание задания отменено.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
+
+    try:
+        points = int(text)
+        if points <= 0:
+            await update.message.reply_text(
+                "❌ Количество баллов должно быть положительным числом. Попробуйте еще раз:"
+            )
+            return ADMIN_SET_TASK_POINTS
+    except ValueError:
+        await update.message.reply_text(
+            "❌ Пожалуйста, введите целое число. Попробуйте еще раз:"
+        )
+        return ADMIN_SET_TASK_POINTS
+
+    task_name = context.user_data.get('task_name')
+
+    if not task_name:
+        await update.message.reply_text(
+            "❌ Ошибка: название задания не найдено. Начните заново.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
+
+    # Сохраняем задание
+    tasks = load_tasks()
+    task_id = generate_unique_id(tasks)
+
+    tasks[task_id] = {
+        'name': task_name,
+        'points': points,
+        'created_at': datetime.now().isoformat(),
+        'created_by': update.effective_user.id
+    }
+    save_tasks(tasks)
+
+    # Очищаем контекст
+    context.user_data.pop('task_name', None)
+
+    await update.message.reply_text(
+        f"✅ <b>Задание успешно создано!</b>\n\n"
+        f"📝 Задание #{task_id}\n"
+        f"🎯 Название: {task_name}\n"
+        f"⭐ Баллы за выполнение: {points}\n\n"
+        f"Теперь пользователи могут отправлять выполнение этого задания!",
+        parse_mode='HTML',
+        reply_markup=get_admin_keyboard()
+    )
+
+    return ConversationHandler.END
+
+async def admin_list_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Список заданий для администратора"""
     user_id = update.effective_user.id
 
     if not is_admin(user_id):
         await update.message.reply_text("❌ У вас нет доступа.")
         return
 
-    users = load_users()
     tasks = load_tasks()
-    submissions = load_submissions()
 
-    total_users = len(users)
-    total_points = sum(user['points'] for user in users.values())
-    total_tasks = len(tasks)
+    if not tasks:
+        await update.message.reply_text(
+            "📭 Заданий нет.",
+            reply_markup=get_admin_keyboard()
+        )
+        return
 
-    pending_subs = len([s for s in submissions.values() if s['status'] == 'pending'])
-    approved_subs = len([s for s in submissions.values() if s['status'] == 'approved'])
-    rejected_subs = len([s for s in submissions.values() if s['status'] == 'rejected'])
+    tasks_text = "📋 <b>Список заданий</b>\n\n"
 
-    stats_text = (
-        "📊 <b>Статистика системы</b>\n\n"
-        f"👥 Всего пользователей: {total_users}\n"
-        f"⭐ Всего баллов в системе: {total_points}\n"
-        f"📈 Среднее количество баллов: {total_points / total_users if total_users > 0 else 0:.1f}\n\n"
-        f"📋 Всего заданий: {total_tasks}\n"
-        f"📨 Отправок на проверке: {pending_subs}\n"
-        f"✅ Принятых заданий: {approved_subs}\n"
-        f"❌ Отклоненных заданий: {rejected_subs}"
-    )
+    for task_id, task in tasks.items():
+        tasks_text += (
+            f"📝 <b>Задание #{task_id}</b>\n"
+            f"🎯 Название: {task['name']}\n"
+            f"⭐ Баллы: {task['points']}\n"
+            f"📅 Создано: {task.get('created_at', 'Неизвестно')}\n"
+            f"────────────────────\n"
+        )
 
     await update.message.reply_text(
-        stats_text,
+        tasks_text,
         parse_mode='HTML',
         reply_markup=get_admin_keyboard()
     )
 
+async def submit_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Начало отправки задания"""
+    user_id = str(update.effective_user.id)
+    users = load_users()
 
-async def admin_reset_users_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Начало процесса сброса пользователей"""
+    if user_id not in users:
+        await update.message.reply_text(
+            "❌ Вы не зарегистрированы. Используйте команду /start для регистрации."
+        )
+        return ConversationHandler.END
+
+    tasks = load_tasks()
+
+    if not tasks:
+        await update.message.reply_text(
+            "📭 На данный момент нет доступных заданий.\n"
+            "Ожидайте новых заданий от администраторов!",
+            reply_markup=get_main_keyboard(update.effective_user.id)
+        )
+        return ConversationHandler.END
+
+    # Создаем клавиатуру с заданиями
+    keyboard = []
+    for task_id, task in tasks.items():
+        button_text = f"📝 {task['name']} ({task['points']} баллов)"
+        keyboard.append([KeyboardButton(button_text)])
+
+    keyboard.append([KeyboardButton("🔙 Отмена")])
+
+    await update.message.reply_text(
+        "📤 <b>Отправка задания</b>\n\n"
+        "Выберите задание для отправки:",
+        parse_mode='HTML',
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    )
+
+    return USER_SUBMIT_TASK
+
+async def submit_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка выбора задания и запрос доказательства"""
+    text = update.message.text
+
+    if text == "🔙 Отмена":
+        await update.message.reply_text(
+            "❌ Отправка задания отменена.",
+            reply_markup=get_main_keyboard(update.effective_user.id)
+        )
+        return ConversationHandler.END
+
+    # Извлекаем название задания из текста
+    try:
+        task_name = text.split(' (')[0][2:]  # Убираем эмодзи и пробел
+    except (IndexError, ValueError):
+        await update.message.reply_text(
+            "❌ Ошибка выбора задания. Попробуйте еще раз:"
+        )
+        return USER_SUBMIT_TASK
+
+    tasks = load_tasks()
+
+    # Находим задание по названию
+    selected_task = None
+    selected_task_id = None
+
+    for task_id, task in tasks.items():
+        if task['name'] == task_name:
+            selected_task = task
+            selected_task_id = task_id
+            break
+
+    if not selected_task:
+        await update.message.reply_text(
+            "❌ Задание не найдено. Попробуйте еще раз:"
+        )
+        return USER_SUBMIT_TASK
+
+    # Сохраняем выбранное задание в контексте
+    context.user_data['selected_task'] = selected_task
+    context.user_data['selected_task_id'] = selected_task_id
+
+    await update.message.reply_text(
+        f"📝 <b>Вы выбрали задание:</b>\n\n"
+        f"🎯 {selected_task['name']}\n"
+        f"⭐ Баллы за выполнение: {selected_task['points']}\n\n"
+        f"Теперь отправьте доказательство выполнения задания "
+        f"(текст, фото, видео или документ):",
+        parse_mode='HTML',
+        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
+    )
+
+    return USER_SUBMIT_TASK
+
+async def handle_submission(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка доказательства выполнения задания"""
+    user_id = str(update.effective_user.id)
+    users = load_users()
+
+    if user_id not in users:
+        await update.message.reply_text(
+            "❌ Вы не зарегистрированы.",
+            reply_markup=get_main_keyboard(update.effective_user.id)
+        )
+        return ConversationHandler.END
+
+    selected_task = context.user_data.get('selected_task')
+    selected_task_id = context.user_data.get('selected_task_id')
+
+    if not selected_task or not selected_task_id:
+        await update.message.reply_text(
+            "❌ Ошибка: задание не найдено. Начните заново.",
+            reply_markup=get_main_keyboard(update.effective_user.id)
+        )
+        return ConversationHandler.END
+
+    user_data = users[user_id]
+
+    # Сохраняем отправку
+    submissions = load_submissions()
+    submission_id = generate_unique_id(submissions)
+
+    # Определяем тип контента
+    content_type = 'text'
+    content = update.message.text or ''
+
+    if update.message.photo:
+        content_type = 'photo'
+        content = f"Фото: {update.message.photo[-1].file_id}"
+    elif update.message.video:
+        content_type = 'video'
+        content = f"Видео: {update.message.video.file_id}"
+    elif update.message.document:
+        content_type = 'document'
+        content = f"Документ: {update.message.document.file_id}"
+
+    submissions[submission_id] = {
+        'user_id': user_id,
+        'user_name': f"{user_data['first_name']} {user_data['surname']}",
+        'user_unique_id': user_data['unique_id'],
+        'task_id': selected_task_id,
+        'task_name': selected_task['name'],
+        'task_points': selected_task['points'],
+        'content_type': content_type,
+        'content': content,
+        'submission_time': datetime.now().isoformat(),
+        'status': 'pending',
+        'reviewed_by': None,
+        'reviewed_at': None
+    }
+    save_submissions(submissions)
+
+    # Уведомляем администраторов
+    for admin_id in ADMIN_IDS:
+        try:
+            await context.bot.send_message(
+                chat_id=admin_id,
+                text=f"📨 <b>Новая отправка задания!</b>\n\n"
+                     f"👤 <b>Пользователь:</b> {user_data['first_name']} {user_data['surname']} (ID: #{user_data['unique_id']})\n"
+                     f"📝 <b>Задание:</b> {selected_task['name']}\n"
+                     f"⭐ <b>Баллы:</b> {selected_task['points']}\n"
+                     f"🆔 <b>Отправка #:</b> {submission_id}\n"
+                     f"🕒 <b>Время:</b> {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
+                     f"Для проверки используйте панель администратора.",
+                parse_mode='HTML'
+            )
+        except Exception as e:
+            logger.error(f"Не удалось отправить уведомление администратору {admin_id}: {e}")
+
+    await update.message.reply_text(
+        f"✅ <b>Отправка успешно сохранена!</b>\n\n"
+        f"📝 <b>Задание:</b> {selected_task['name']}\n"
+        f"⭐ <b>Баллы за выполнение:</b> {selected_task['points']}\n"
+        f"🆔 <b>Номер отправки:</b> #{submission_id}\n\n"
+        f"Ожидайте проверки администратором. "
+        f"Вы получите уведомление, когда отправка будет проверена.",
+        parse_mode='HTML',
+        reply_markup=get_main_keyboard(update.effective_user.id)
+    )
+
+    # Очищаем контекст
+    context.user_data.pop('selected_task', None)
+    context.user_data.pop('selected_task_id', None)
+
+    return ConversationHandler.END
+
+async def admin_review_submissions(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Проверка отправленных заданий"""
+    user_id = update.effective_user.id
+
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ У вас нет доступа.")
+        return ConversationHandler.END
+
+    submissions = load_submissions()
+
+    # Фильтруем только ожидающие проверки
+    pending_submissions = {
+        sub_id: sub for sub_id, sub in submissions.items()
+        if sub['status'] == 'pending'
+    }
+
+    if not pending_submissions:
+        await update.message.reply_text(
+            "📭 Нет отправок, ожидающих проверки.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
+
+    # Создаем inline клавиатуру с отправками
+    keyboard = []
+    for sub_id, submission in pending_submissions.items():
+        button_text = f"#{sub_id} - {submission['user_name']} - {submission['task_name']}"
+        keyboard.append([InlineKeyboardButton(button_text, callback_data=f"review_{sub_id}")])
+
+    keyboard.append([InlineKeyboardButton("🔙 Отмена", callback_data="review_cancel")])
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "📨 <b>Проверка отправленных заданий</b>\n\n"
+        "Выберите отправку для проверки:",
+        parse_mode='HTML',
+        reply_markup=reply_markup
+    )
+
+    return ADMIN_REVIEW_SELECT
+
+async def handle_review_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка callback'ов для проверки заданий"""
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "review_cancel":
+        await query.edit_message_text(
+            "❌ Проверка отправок отменена.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
+
+    if query.data.startswith("review_"):
+        submission_id = query.data.split('_')[1]
+        submissions = load_submissions()
+
+        if submission_id not in submissions:
+            await query.edit_message_text(
+                "❌ Отправка не найдена.",
+                reply_markup=get_admin_keyboard()
+            )
+            return ConversationHandler.END
+
+        submission = submissions[submission_id]
+
+        # Показываем детали отправки
+        submission_text = (
+            f"📨 <b>Отправка #{submission_id}</b>\n\n"
+            f"👤 <b>Пользователь:</b> {submission['user_name']} (ID: #{submission['user_unique_id']})\n"
+            f"📝 <b>Задание:</b> {submission['task_name']}\n"
+            f"⭐ <b>Баллы:</b> {submission['task_points']}\n"
+            f"🕒 <b>Время отправки:</b> {submission['submission_time']}\n"
+            f"📄 <b>Тип контента:</b> {submission['content_type']}\n\n"
+        )
+
+        if submission['content_type'] == 'text':
+            submission_text += f"<b>Содержание:</b>\n{submission['content']}\n\n"
+        else:
+            submission_text += f"<b>Файл:</b> {submission['content']}\n\n"
+
+        submission_text += "<b>Выберите действие:</b>"
+
+        # Создаем клавиатуру для принятия/отклонения
+        keyboard = [
+            [
+                InlineKeyboardButton("✅ Принять", callback_data=f"accept_{submission_id}"),
+                InlineKeyboardButton("❌ Отклонить", callback_data=f"reject_{submission_id}")
+            ],
+            [InlineKeyboardButton("🔙 Назад к списку", callback_data="review_back")]
+        ]
+
+        await query.edit_message_text(
+            submission_text,
+            parse_mode='HTML',
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+    elif query.data == "review_back":
+        return await admin_review_submissions(update, context)
+
+    elif query.data.startswith("accept_") or query.data.startswith("reject_"):
+        action = query.data.split('_')[0]
+        submission_id = query.data.split('_')[1]
+
+        submissions = load_submissions()
+        users = load_users()
+
+        if submission_id not in submissions:
+            await query.edit_message_text(
+                "❌ Отправка не найдена.",
+                reply_markup=get_admin_keyboard()
+            )
+            return ConversationHandler.END
+
+        submission = submissions[submission_id]
+        user_id = submission['user_id']
+
+        if action == "accept":
+            # Начисляем баллы
+            if user_id in users:
+                users[user_id]['points'] += submission['task_points']
+                save_users(users)
+
+            submissions[submission_id]['status'] = 'accepted'
+            submissions[submission_id]['reviewed_by'] = query.from_user.id
+            submissions[submission_id]['reviewed_at'] = datetime.now().isoformat()
+            save_submissions(submissions)
+
+            # Уведомляем пользователя
+            try:
+                await context.bot.send_message(
+                    chat_id=int(user_id),
+                    text=f"🎉 <b>Ваша отправка проверена!</b>\n\n"
+                         f"📝 <b>Задание:</b> {submission['task_name']}\n"
+                         f"✅ <b>Статус:</b> Принято\n"
+                         f"⭐ <b>Начислено баллов:</b> {submission['task_points']}\n"
+                         f"💰 <b>Текущий баланс:</b> {users[user_id]['points']} баллов\n"
+                         f"🆔 <b>Номер отправки:</b> #{submission_id}\n\n"
+                         f"Поздравляем с успешным выполнением задания! 🎊",
+                    parse_mode='HTML'
+                )
+            except Exception as e:
+                logger.error(f"Не удалось уведомить пользователя {user_id}: {e}")
+
+            await query.edit_message_text(
+                f"✅ <b>Отправка принята!</b>\n\n"
+                f"👤 Пользователь: {submission['user_name']}\n"
+                f"📝 Задание: {submission['task_name']}\n"
+                f"⭐ Начислено баллов: {submission['task_points']}\n"
+                f"💰 Новый баланс: {users[user_id]['points']} баллов",
+                parse_mode='HTML',
+                reply_markup=get_admin_keyboard()
+            )
+
+        else:  # reject
+            submissions[submission_id]['status'] = 'rejected'
+            submissions[submission_id]['reviewed_by'] = query.from_user.id
+            submissions[submission_id]['reviewed_at'] = datetime.now().isoformat()
+            save_submissions(submissions)
+
+            # Уведомляем пользователя
+            try:
+                await context.bot.send_message(
+                    chat_id=int(user_id),
+                    text=f"❌ <b>Ваша отправка проверена</b>\n\n"
+                         f"📝 <b>Задание:</b> {submission['task_name']}\n"
+                         f"❌ <b>Статус:</b> Отклонено\n"
+                         f"🆔 <b>Номер отправки:</b> #{submission_id}\n\n"
+                         f"Пожалуйста, проверьте требования к заданию и попробуйте снова.",
+                    parse_mode='HTML'
+                )
+            except Exception as e:
+                logger.error(f"Не удалось уведомить пользователя {user_id}: {e}")
+
+            await query.edit_message_text(
+                f"❌ <b>Отправка отклонена!</b>\n\n"
+                f"👤 Пользователь: {submission['user_name']}\n"
+                f"📝 Задание: {submission['task_name']}\n"
+                f"🆔 Номер отправки: #{submission_id}",
+                parse_mode='HTML',
+                reply_markup=get_admin_keyboard()
+            )
+
+    return ConversationHandler.END
+
+async def admin_fix_id_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Начало исправления ID"""
     user_id = update.effective_user.id
 
     if not is_admin(user_id):
@@ -2253,105 +1665,304 @@ async def admin_reset_users_start(update: Update, context: ContextTypes.DEFAULT_
 
     if not users:
         await update.message.reply_text(
-            "📭 Пользователей и так нет.",
+            "📭 Пользователей нет.",
             reply_markup=get_admin_keyboard()
         )
         return ConversationHandler.END
 
-    # Показываем подтверждение с информацией
-    users_count = len(users)
-    total_points = sum(user['points'] for user in users.values())
+    # Создаем клавиатуру с пользователями
+    keyboard = []
+    for telegram_id, user_data in users.items():
+        button_text = f"#{user_data['unique_id']} - {user_data['first_name']} {user_data['surname']}"
+        keyboard.append([KeyboardButton(button_text)])
 
-    confirmation_text = (
-        f"⚠️ <b>ВНИМАНИЕ! ОПАСНАЯ ОПЕРАЦИЯ!</b>\n\n"
-        f"Вы собираетесь удалить ВСЕХ пользователей:\n"
-        f"👥 Количество пользователей: {users_count}\n"
-        f"⭐ Всего баллов в системе: {total_points}\n\n"
-        f"<b>Эта операция необратима!</b>\n\n"
-        f"Для подтверждения введите: <code>ПОДТВЕРЖДАЮ СБРОС</code>\n"
-        f"Для отмены нажмите кнопку \"🔙 Отмена\""
-    )
-
-    keyboard = [[KeyboardButton("🔙 Отмена")]]
+    keyboard.append([KeyboardButton("🔙 Отмена")])
 
     await update.message.reply_text(
-        confirmation_text,
+        "🆔 <b>Исправление ID пользователя</b>\n\n"
+        "Выберите пользователя для исправления ID:",
         parse_mode='HTML',
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
 
-    return ADMIN_CONFIRM_RESET
+    return ADMIN_FIX_ID_SELECT_USER
 
-
-async def admin_reset_users_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Подтверждение сброса пользователей"""
+async def admin_fix_id_select_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Выбор пользователя для исправления ID"""
     text = update.message.text
 
     if text == "🔙 Отмена":
         await update.message.reply_text(
-            "❌ Сброс пользователей отменен.",
+            "❌ Исправление ID отменено.",
             reply_markup=get_admin_keyboard()
         )
         return ConversationHandler.END
 
-    if text != "ПОДТВЕРЖДАЮ СБРОС":
+    # Извлекаем ID пользователя из текста
+    try:
+        unique_id = int(text.split('#')[1].split(' ')[0])
+    except (IndexError, ValueError):
         await update.message.reply_text(
-            "❌ Для подтверждения сброса необходимо ввести точную фразу: <code>ПОДТВЕРЖДАЮ СБРОС</code>\n\n"
-            "Для отмены нажмите кнопку \"🔙 Отмена\"",
-            parse_mode='HTML'
+            "❌ Ошибка выбора пользователя. Попробуйте еще раз:"
         )
-        return ADMIN_CONFIRM_RESET
+        return ADMIN_FIX_ID_SELECT_USER
 
-    # Сохраняем информацию о сбросе для логов
     users = load_users()
-    users_count = len(users)
-    total_points = sum(user['points'] for user in users.values())
 
-    # Сбрасываем пользователей
-    save_users({})
+    # Находим пользователя по unique_id
+    selected_user = None
+    selected_user_id = None
 
-    # Также сбрасываем задания, отправки и заказы (опционально)
-    save_tasks({})
-    save_submissions({})
-    save_orders({})
+    for telegram_id, user_data in users.items():
+        if user_data['unique_id'] == unique_id:
+            selected_user = user_data
+            selected_user_id = telegram_id
+            break
 
-    logger.warning(
-        f"Администратор {update.effective_user.id} сбросил всех пользователей. Удалено: {users_count} пользователей, {total_points} баллов")
+    if not selected_user:
+        await update.message.reply_text(
+            "❌ Пользователь не найден. Попробуйте еще раз:"
+        )
+        return ADMIN_FIX_ID_SELECT_USER
+
+    # Сохраняем выбранного пользователя в контексте
+    context.user_data['selected_user_id'] = selected_user_id
+    context.user_data['selected_user_name'] = f"{selected_user['first_name']} {selected_user['surname']}"
+    context.user_data['selected_user_old_id'] = unique_id
 
     await update.message.reply_text(
-        f"✅ <b>Сброс выполнен успешно!</b>\n\n"
-        f"🗑️ Удалено пользователей: {users_count}\n"
-        f"⭐ Удалено баллов: {total_points}\n"
-        f"📋 Очищены задания и заказы\n\n"
-        f"Система полностью сброшена.",
+        f"👤 <b>Выбран пользователь:</b>\n\n"
+        f"🆔 Текущий ID: #{unique_id}\n"
+        f"👤 Имя: {selected_user['first_name']} {selected_user['surname']}\n\n"
+        f"Введите новый ID (целое число):",
+        parse_mode='HTML',
+        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
+    )
+
+    return ADMIN_FIX_ID_SET_NEW
+
+async def admin_fix_id_set_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Установка нового ID"""
+    text = update.message.text
+
+    if text == "🔙 Отмена":
+        await update.message.reply_text(
+            "❌ Исправление ID отменено.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
+
+    try:
+        new_id = int(text)
+        if new_id <= 0:
+            await update.message.reply_text(
+                "❌ ID должен быть положительным числом. Попробуйте еще раз:"
+            )
+            return ADMIN_FIX_ID_SET_NEW
+    except ValueError:
+        await update.message.reply_text(
+            "❌ Пожалуйста, введите целое число. Попробуйте еще раз:"
+        )
+        return ADMIN_FIX_ID_SET_NEW
+
+    selected_user_id = context.user_data.get('selected_user_id')
+    selected_user_name = context.user_data.get('selected_user_name')
+    old_id = context.user_data.get('selected_user_old_id')
+
+    if not selected_user_id:
+        await update.message.reply_text(
+            "❌ Ошибка: пользователь не найден. Начните заново.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
+
+    users = load_users()
+
+    # Проверяем, не занят ли новый ID
+    for telegram_id, user_data in users.items():
+        if user_data['unique_id'] == new_id and telegram_id != selected_user_id:
+            await update.message.reply_text(
+                f"❌ ID #{new_id} уже занят пользователем {user_data['first_name']} {user_data['surname']}. "
+                f"Попробуйте другой ID:"
+            )
+            return ADMIN_FIX_ID_SET_NEW
+
+    # Обновляем ID
+    users[selected_user_id]['unique_id'] = new_id
+    save_users(users)
+
+    # Очищаем контекст
+    context.user_data.pop('selected_user_id', None)
+    context.user_data.pop('selected_user_name', None)
+    context.user_data.pop('selected_user_old_id', None)
+
+    await update.message.reply_text(
+        f"✅ <b>ID успешно изменен!</b>\n\n"
+        f"👤 Пользователь: {selected_user_name}\n"
+        f"🆔 Старый ID: #{old_id}\n"
+        f"🆔 Новый ID: #{new_id}",
         parse_mode='HTML',
         reply_markup=get_admin_keyboard()
     )
 
     return ConversationHandler.END
 
-async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка нажатий на кнопки"""
+async def admin_reset_users_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Начало сброса всех пользователей"""
     user_id = update.effective_user.id
+
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ У вас нет доступа.")
+        return ConversationHandler.END
+
     users = load_users()
+
+    if not users:
+        await update.message.reply_text(
+            "📭 Пользователей для сброса нет.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
+
+    await update.message.reply_text(
+        "⚠️ <b>ВНИМАНИЕ! ОПАСНАЯ ОПЕРАЦИЯ!</b>\n\n"
+        "Вы собираетесь удалить ВСЕХ пользователей и ВСЕ данные.\n\n"
+        "<b>Это действие:</b>\n"
+        "• Удалит всех пользователей\n"
+        "• Удалит все задания\n"
+        "• Удалит все отправки\n"
+        "• Удалит все товары и заказы\n"
+        "• <b>НЕЛЬЗЯ ОТМЕНИТЬ!</b>\n\n"
+        "Для подтверждения введите: <code>ПОДТВЕРЖДАЮ СБРОС</code>",
+        parse_mode='HTML',
+        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
+    )
+
+    return ADMIN_CONFIRM_RESET
+
+async def admin_confirm_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Подтверждение сброса всех данных"""
     text = update.message.text
 
-    # Глобальная обработка кнопок "Назад" и "Отмена"
-    if text in ["🔙 Назад", "🔙 Отмена", "🔙 Главное меню"]:
-        if is_admin(user_id):
-            await update.message.reply_text(
-                "🔙 Возврат в меню администратора.",
-                reply_markup=get_admin_keyboard()
-            )
-        else:
-            await update.message.reply_text(
-                "🔙 Возврат в главное меню.",
-                reply_markup=get_main_keyboard(user_id)
-            )
+    if text == "🔙 Отмена":
+        await update.message.reply_text(
+            "❌ Сброс данных отменен.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
+
+    if text != "ПОДТВЕРЖДАЮ СБРОС":
+        await update.message.reply_text(
+            "❌ Для подтверждения сброса введите точно: <code>ПОДТВЕРЖДАЮ СБРОС</code>",
+            parse_mode='HTML'
+        )
+        return ADMIN_CONFIRM_RESET
+
+    # Удаляем все файлы с данными
+    files_to_delete = [DATA_FILE, TASKS_FILE, SUBMISSIONS_FILE, PRODUCTS_FILE, ORDERS_FILE]
+
+    deleted_files = []
+    for file_path in files_to_delete:
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                deleted_files.append(file_path)
+        except Exception as e:
+            logger.error(f"Ошибка удаления файла {file_path}: {e}")
+
+    await update.message.reply_text(
+        f"🗑️ <b>Все данные сброшены!</b>\n\n"
+        f"Удаленные файлы:\n"
+        f"• {DATA_FILE}\n"
+        f"• {TASKS_FILE}\n"
+        f"• {SUBMISSIONS_FILE}\n"
+        f"• {PRODUCTS_FILE}\n"
+        f"• {ORDERS_FILE}\n\n"
+        f"Теперь база данных пуста. Новые пользователи могут зарегистрироваться с помощью /start",
+        parse_mode='HTML',
+        reply_markup=get_admin_keyboard()
+    )
+
+    return ConversationHandler.END
+
+async def admin_statistics(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Статистика системы"""
+    user_id = update.effective_user.id
+
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ У вас нет доступа.")
         return
 
-  # Проверка для обычных пользователей
-    if str(user_id) not in users and text in ["👤 Профиль", "🛍️ Магазин", "📊 Рейтинг участников", "📤 Отправить задание", "👨‍💼 Панель администратора"]:
+    users = load_users()
+    tasks = load_tasks()
+    submissions = load_submissions()
+    products = load_products()
+    orders = load_orders()
+
+    # Статистика пользователей
+    total_users = len(users)
+    total_points = sum(user['points'] for user in users.values())
+    average_points = total_points / total_users if total_users > 0 else 0
+
+    # Статистика заданий
+    total_tasks = len(tasks)
+    total_task_points = sum(task['points'] for task in tasks.values())
+
+    # Статистика отправок
+    total_submissions = len(submissions)
+    pending_submissions = len([s for s in submissions.values() if s['status'] == 'pending'])
+    accepted_submissions = len([s for s in submissions.values() if s['status'] == 'accepted'])
+    rejected_submissions = len([s for s in submissions.values() if s['status'] == 'rejected'])
+
+    # Статистика товаров
+    total_products = len(products)
+    total_products_sold = sum(product.get('sold', 0) for product in products.values())
+    total_revenue = sum(product.get('sold', 0) * product['price'] for product in products.values())
+
+    # Статистика заказов
+    total_orders = len(orders)
+
+    stats_text = (
+        "📊 <b>Статистика системы</b>\n\n"
+        
+        "👥 <b>Пользователи:</b>\n"
+        f"• Всего пользователей: {total_users}\n"
+        f"• Всего баллов в системе: {total_points}\n"
+        f"• Средний балл на пользователя: {average_points:.1f}\n\n"
+        
+        "📝 <b>Задания:</b>\n"
+        f"• Всего заданий: {total_tasks}\n"
+        f"• Всего возможных баллов: {total_task_points}\n\n"
+        
+        "📨 <b>Отправки заданий:</b>\n"
+        f"• Всего отправок: {total_submissions}\n"
+        f"• Ожидают проверки: {pending_submissions}\n"
+        f"• Принято: {accepted_submissions}\n"
+        f"• Отклонено: {rejected_submissions}\n\n"
+        
+        "🛍️ <b>Магазин:</b>\n"
+        f"• Всего товаров: {total_products}\n"
+        f"• Всего продаж: {total_products_sold}\n"
+        f"• Общая выручка: {total_revenue} баллов\n\n"
+        
+        "📦 <b>Заказы:</b>\n"
+        f"• Всего заказов: {total_orders}"
+    )
+
+    await update.message.reply_text(
+        stats_text,
+        parse_mode='HTML',
+        reply_markup=get_admin_keyboard()
+    )
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка текстовых сообщений"""
+    user_id = update.effective_user.id
+    text = update.message.text
+
+    # Проверяем, зарегистрирован ли пользователь
+    users = load_users()
+    if str(user_id) not in users and text != "/start":
         await update.message.reply_text(
             "❌ Вы не зарегистрированы. Используйте команду /start для регистрации."
         )
@@ -2368,66 +1979,162 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await submit_task_start(update, context)
     elif text == "👨‍💼 Панель администратора":
         await admin_panel(update, context)
+    elif text == "🔙 Главное меню":
+        await update.message.reply_text(
+            "🔙 Возврат в главное меню.",
+            reply_markup=get_main_keyboard(user_id)
+        )
 
-    # Обработка кнопок администратора (из админ-панели)
+    # Обработка кнопок администратора
     elif text == "👥 Список пользователей":
-        await admin_users_list(update, context)
+        await admin_list_users(update, context)
     elif text == "⭐ Добавить баллы":
         await admin_add_points_start(update, context)
     elif text == "📝 Создать задание":
         await admin_create_task_start(update, context)
     elif text == "📋 Список заданий":
-        await admin_tasks_list(update, context)
+        await admin_list_tasks(update, context)
     elif text == "📨 Проверка заданий":
-        await admin_pending_submissions(update, context)
+        await admin_review_submissions(update, context)
     elif text == "🛍️ Добавить товар":
         await admin_create_product_start(update, context)
     elif text == "📦 Список товаров":
-        await admin_products_list(update, context)
+        await admin_list_products(update, context)
+    elif text == "🗑️ Удалить товар":
+        await admin_delete_product(update, context)
     elif text == "🆔 Исправить ID":
         await admin_fix_id_start(update, context)
     elif text == "🗑️ Сбросить пользователей":
         await admin_reset_users_start(update, context)
-    elif text == "🗑️ Удалить товар":
-        await admin_delete_product(update, context)
     elif text == "📊 Статистика":
-        await admin_stats(update, context)
+        await admin_statistics(update, context)
+
+    else:
+        await update.message.reply_text(
+            "🤔 Не понимаю вашу команду. Используйте кнопки меню.",
+            reply_markup=get_main_keyboard(user_id)
+        )
+
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отмена для пользователей"""
+    """Отмена любого действия"""
+    user_id = update.effective_user.id
     await update.message.reply_text(
         "❌ Действие отменено.",
-        reply_markup=get_main_keyboard(update.effective_user.id)
+        reply_markup=get_main_keyboard(user_id)
     )
     return ConversationHandler.END
 
-async def admin_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отмена действий администратора"""
-    await update.message.reply_text(
-        "❌ Действие отменено.",
-        reply_markup=get_admin_keyboard()
-    )
-    return ConversationHandler.END
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик ошибок"""
+    logger.error(f"Ошибка при обработке обновления {update}: {context.error}")
 
+    if update and update.effective_message:
+        try:
+            await update.effective_message.reply_text(
+                "❌ Произошла ошибка при обработке вашего запроса. "
+                "Пожалуйста, попробуйте еще раз."
+            )
+        except Exception as e:
+            logger.error(f"Не удалось отправить сообщение об ошибке: {e}")
 
 def main():
-    """Запуск бота"""
-    TOKEN = '8549336941:AAHUqok5bUKTypT-X8UGtXdkih8CDTNnHJ4'
-
+    """Основная функция запуска бота"""
+    # Создаем Application
     application = Application.builder().token(TOKEN).build()
 
-    # ConversationHandler для регистрации пользователей
-    user_conv_handler = ConversationHandler(
+    # Обработчик регистрации
+    registration_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
-            WAITING_FOR_FIRST_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_first_name)],
-            WAITING_FOR_SURNAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_surname)]
+            WAITING_FOR_FIRST_NAME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, register_first_name)
+            ],
+            WAITING_FOR_SURNAME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, register_surname)
+            ],
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
-    # ConversationHandler для администратора (добавление товаров)
-    admin_product_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
+    # Обработчик добавления баллов
+    add_points_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.Regex("^⭐ Добавить баллы$"), admin_add_points_start)],
+        states={
+            ADMIN_SELECT_USER: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_select_user)
+            ],
+            ADMIN_ADD_POINTS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_add_points)
+            ],
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
+
+    # Обработчик создания задания
+    create_task_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.Regex("^📝 Создать задание$"), admin_create_task_start)],
+        states={
+            ADMIN_CREATE_TASK: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_task)
+            ],
+            ADMIN_SET_TASK_POINTS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_task_points)
+            ],
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
+
+    # Обработчик отправки задания
+    submit_task_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.Regex("^📤 Отправить задание$"), submit_task_start)],
+        states={
+            USER_SUBMIT_TASK: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task),
+                MessageHandler(filters.PHOTO | filters.VIDEO | filters.DOCUMENT, handle_submission)
+            ],
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
+
+    # Обработчик исправления ID
+    fix_id_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.Regex("^🆔 Исправить ID$"), admin_fix_id_start)],
+        states={
+            ADMIN_FIX_ID_SELECT_USER: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_fix_id_select_user)
+            ],
+            ADMIN_FIX_ID_SET_NEW: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_fix_id_set_new)
+            ],
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
+
+    # Обработчик сброса пользователей
+    reset_users_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.Regex("^🗑️ Сбросить пользователей$"), admin_reset_users_start)],
+        states={
+            ADMIN_CONFIRM_RESET: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_confirm_reset)
+            ],
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
+
+    # Обработчик проверки заданий
+    review_submissions_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.Regex("^📨 Проверка заданий$"), admin_review_submissions)],
+        states={
+            ADMIN_REVIEW_SELECT: [
+                CallbackQueryHandler(handle_review_callback, pattern="^review_")
+            ],
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
+
+    # Обработчик создания товара
+    create_product_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.Regex("^🛍️ Добавить товар$"), admin_create_product_start)],
         states={
             ADMIN_CREATE_PRODUCT_NAME: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_name)
@@ -2440,279 +2147,63 @@ def main():
             ],
             ADMIN_SET_PRODUCT_QUANTITY: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_product_quantity)
-            ]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для пользователей (покупка товаров)
-    user_buy_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🛍️ Магазин$'), shop)],
-        states={
-            USER_BUY_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_product)],
-            USER_CONFIRM_PURCHASE: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_purchase)]
+            ],
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
-    # ConversationHandler для администратора (добавление баллов)
-    admin_points_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^⭐ Добавить баллы$'), admin_add_points_start)],
+    # Обработчик покупки товара
+    buy_product_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.Regex("^🛒 Купить товар #"), buy_product)],
         states={
-            ADMIN_SELECT_USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_select_user)],
-            ADMIN_ADD_POINTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_add_points_finish)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для администратора (создание заданий)
-    admin_task_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📝 Создать задание$'), admin_create_task_start)],
-        states={
-            ADMIN_CREATE_TASK: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_task_finish)],
-            ADMIN_SET_TASK_POINTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_task_points)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для администратора (исправление ID)
-    admin_fix_id_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🆔 Исправить ID$'), admin_fix_id_start)],
-        states={
-            ADMIN_FIX_ID_SELECT_USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_fix_id_select_user)],
-            ADMIN_FIX_ID_SET_NEW: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_fix_id_set_new)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для администратора (сброс пользователей)
-    admin_reset_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🗑️ Сбросить пользователей$'), admin_reset_users_start)],
-        states={
-            ADMIN_CONFIRM_RESET: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_reset_users_confirm)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для администратора (проверка заданий)
-    admin_review_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📨 Проверка заданий$'), admin_pending_submissions)],
-        states={
-            ADMIN_REVIEW_SELECT: [
-                MessageHandler(filters.Regex('^🔙 Назад$'), lambda update, context: admin_cancel(update, context)),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_review_submission)
-            ]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для пользователей (отправка заданий)
-    user_task_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
-        states={
-            USER_SUBMIT_TASK: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_finish),
-                MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT,
-                               handle_task_submission)
-            ]
+            USER_BUY_PRODUCT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, buy_product)
+            ],
+            USER_CONFIRM_PURCHASE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_purchase)
+            ],
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
-    # Добавление обработчиков
-    application.add_handler(user_conv_handler)
-    application.add_handler(admin_points_conv_handler)
-    application.add_handler(admin_task_conv_handler)
-    application.add_handler(admin_fix_id_conv_handler)
-    application.add_handler(admin_review_conv_handler)
-    application.add_handler(user_task_conv_handler)
-    application.add_handler(admin_product_conv_handler)
-    application.add_handler(user_buy_conv_handler)
-    application.add_handler(admin_reset_conv_handler)
+    # Добавляем обработчики
+    application.add_handler(registration_handler)
+    application.add_handler(add_points_handler)
+    application.add_handler(create_task_handler)
+    application.add_handler(submit_task_handler)
+    application.add_handler(fix_id_handler)
+    application.add_handler(reset_users_handler)
+    application.add_handler(review_submissions_handler)
+    application.add_handler(create_product_handler)
+    application.add_handler(buy_product_handler)
 
-    # В функции main() замените обработчики удаления товара на:
-    application.add_handler(MessageHandler(filters.Regex('^🗑️ Удалить товар$'), admin_delete_product))
-    application.add_handler(CallbackQueryHandler(handle_delete_product_callback, pattern='^delete_product_'))
-    application.add_handler(CallbackQueryHandler(handle_confirm_delete_callback, pattern='^confirm_delete_'))
-    application.add_handler(CallbackQueryHandler(handle_delete_cancel_final, pattern='^delete_cancel_final'))
-    application.add_handler(CallbackQueryHandler(handle_delete_product_callback, pattern='^delete_cancel'))
+    # Обработчик callback'ов для удаления товара
+    application.add_handler(CallbackQueryHandler(handle_delete_product_callback, pattern="^delete_"))
 
-    # Общие обработчики
-    application.add_handler(CallbackQueryHandler(handle_submission_callback))
-    application.add_handler(CommandHandler('admin', admin_panel))
-    application.add_handler(MessageHandler(
-        filters.Regex(
-            r'^(👤 Профиль|🛍️ Магазин|📊 Рейтинг участников|📤 Отправить задание|👨‍💼 Панель администратора|👥 Список пользователей|⭐ Добавить баллы|📝 Создать задание|📋 Список заданий|📨 Проверка заданий|🛍️ Добавить товар|📦 Список товаров|🗑️ Удалить товар|🆔 Исправить ID|🗑️ Сбросить пользователей|📊 Статистика|🔙 Главное меню|🔙 Назад|🔙 Отмена|🛒 Купить товар #\d+|✅ Да, купить товар|❌ Нет, отменить|🔙 Назад к товарам)$'),
-        handle_buttons
-    ))
+    # Обработчик текстовых сообщений
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    logger.info("Бот запущен!")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    # Обработчик ошибок
+    application.add_error_handler(error_handler)
 
-import os
-import asyncio
-
-
-def main_web():
-    """Функция для запуска на веб-сервере"""
-    # Получаем токен из переменных окружения Railway
-    TOKEN = os.environ.get('BOT_TOKEN', '8549336941:AAHUqok5bUKTyPI-X8UGtxdkih8CDTMnHJ4')
-    application = Application.builder().token(TOKEN).build()
-
-    # ConversationHandler для регистрации пользователей
-    user_conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
-        states={
-            WAITING_FOR_FIRST_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_first_name)],
-            WAITING_FOR_SURNAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_surname)]
-        },
-        fallbacks=[CommandHandler('cancel', cancel)]
-    )
+    # Запускаем бота
+    port = int(os.environ.get('PORT', 8443))
+    webhook_url = os.environ.get('WEBHOOK_URL')
     
-    # Add handler to application
-    application.add_handler(user_conv_handler)
-    
-    # Start the bot
-    application.run_polling()
-
-# Make sure these handler functions are defined:
-# start(), register_first_name(), register_surname(), cancel()
-
-    # ConversationHandler для администратора (добавление товаров)
-    admin_product_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('⚠️ добавить товар$'), admin_create_product_start)],
-        states={
-            ADMIN_CREATE_PRODUCT_NAME: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_name)
-            ],
-            ADMIN_CREATE_PRODUCT_DESCRIPTION: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_description)
-            ],
-            ADMIN_CREATE_PRODUCT_PRICE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_price)
-            ],
-            ADMIN_SET_PRODUCT_QUANTITY: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_product_quantity)
-            ]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для пользователей (покупка товаров)
-    user_buy_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🛍️ Магазин$'), shop)],
-        states={
-            USER_BUY_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_product)],
-            USER_CONFIRM_PURCHASE: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_purchase)]
-        },
-        fallbacks=[CommandHandler('cancel', cancel)]
-    )
-
-    # ConversationHandler для администратора (добавление баллов)
-    admin_points_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^⭐ Добавить баллы$'), admin_add_points_start)],
-        states={
-            ADMIN_SELECT_USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_select_user)],
-            ADMIN_ADD_POINTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_add_points_finish)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для администратора (создание заданий)
-    admin_task_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📝 Создать задание$'), admin_create_task_start)],
-        states={
-            ADMIN_CREATE_TASK: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_task_finish)],
-            ADMIN_SET_TASK_POINTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_task_points)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для администратора (исправление ID)
-    admin_fix_id_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🆔 Исправить ID$'), admin_fix_id_start)],
-        states={
-            ADMIN_FIX_ID_SELECT_USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_fix_id_select_user)],
-            ADMIN_FIX_ID_SET_NEW: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_fix_id_set_new)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для администратора (сброс пользователей)
-    admin_reset_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🗑️ Сбросить пользователей$'), admin_reset_users_start)],
-        states={
-            ADMIN_CONFIRM_RESET: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_reset_users_confirm)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для администратора (проверка заданий)
-    admin_review_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📨 Проверка заданий$'), admin_pending_submissions)],
-        states={
-            ADMIN_REVIEW_SELECT: [
-                MessageHandler(filters.Regex('^🔙 Назад$'), lambda update, context: admin_cancel(update, context)),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_review_submission)
-            ]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для пользователей (отправка заданий)
-    user_task_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
-        states={
-            USER_SUBMIT_TASK: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_finish),
-                MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT,
-                               handle_task_submission)
-            ]
-        },
-        fallbacks=[CommandHandler('cancel', cancel)]
-    )
-
-    # Добавление обработчиков
-    application.add_handler(user_conv_handler)
-    application.add_handler(admin_points_conv_handler)
-    application.add_handler(admin_task_conv_handler)
-    application.add_handler(admin_fix_id_conv_handler)
-    application.add_handler(admin_review_conv_handler)
-    application.add_handler(user_task_conv_handler)
-    application.add_handler(admin_product_conv_handler)
-    application.add_handler(user_buy_conv_handler)
-    application.add_handler(admin_reset_conv_handler)
-
-    # В функции main() замените обработчики удаления товара на:
-    application.add_handler(MessageHandler(filters.Regex('^🗑️ Удалить товар$'), admin_delete_product))
-    application.add_handler(CallbackQueryHandler(handle_delete_product_callback, pattern='^delete_product_'))
-    application.add_handler(CallbackQueryHandler(handle_confirm_delete_callback, pattern='^confirm_delete_'))
-    application.add_handler(CallbackQueryHandler(handle_delete_cancel_final, pattern='^delete_cancel_final'))
-    application.add_handler(CallbackQueryHandler(handle_delete_product_callback, pattern='^delete_cancel'))
-
-    # Общие обработчики
-    application.add_handler(CallbackQueryHandler(handle_submission_callback))
-    application.add_handler(CommandHandler('admin', admin_panel))
-    application.add_handler(MessageHandler(
-        filters.Regex(
-            r'^(👤 Профиль|🛍️ Магазин|📊 Рейтинг участников|📤 Отправить задание|👨‍💼 Панель администратора|👥 Список пользователей|⭐ Добавить баллы|📝 Создать задание|📋 Список заданий|📨 Проверка заданий|🛍️ Добавить товар|📦 Список товаров|🗑️ Удалить товар|🆔 Исправить ID|🗑️ Сбросить пользователей|📊 Статистика|🔙 Главное меню|🔙 Назад|🔙 Отмена|🛒 Купить товар #\d+|✅ Да, купить товар|❌ Нет, отменить|🔙 Назад к товарам)$'),
-        handle_buttons
-    ))
-
-    logger.info("Бот запущен на сервере Railway!")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
-
-
-if __name__ == '__main__':
-    # Проверяем, запущен ли код на Railway
-    if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_STATIC_URL'):
-        print("🚀 Запуск на Railway сервере...")
-        main_web()
+    if webhook_url:
+        # Используем вебхук для Railway
+        logger.info(f"Starting bot in webhook mode on port {port}")
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            url_path=TOKEN,
+            webhook_url=f"{webhook_url}/{TOKEN}"
+        )
     else:
-        print("💻 Локальный запуск...")
-        main()
+        # Используем polling для локальной разработки
+        logger.info("Starting bot in polling mode")
+        application.run_polling()
+
 if __name__ == '__main__':
-
     main()
-
 
