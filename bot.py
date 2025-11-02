@@ -2211,149 +2211,28 @@ import os
 import asyncio
 
 def main_web():
-    """Функция для запуска на веб-сервере - синхронная версия"""
-    # Получаем токен из переменных окружения Railway
+    """Упрощенная версия для тестирования"""
     TOKEN = os.environ.get('BOT_TOKEN', '8549336941:AAHUqok5bUKTypT-X8UGtXdkih8CDTNnHJ4')
     
     print(f"🚀 Запуск бота с токеном: {TOKEN[:10]}...")
-    logger.info(f"Запуск бота с токеном: {TOKEN[:10]}...")
     
-    # Создаем application
     application = Application.builder().token(TOKEN).build()
-    print("✅ Application создан")
 
-    # ConversationHandler для администратора (добавление товаров)
-    admin_product_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
-        states={
-            ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_finish)],
-            ADMIN_SET_PRODUCT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_product_description)],
-            ADMIN_SET_PRODUCT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)],
-        name="admin_product_conversation"
-    )
+    # Только базовые команды для теста
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("test", test_command))
+    application.add_handler(CommandHandler("admin", admin_panel))
 
-    # ConversationHandler для регистрации пользователей
-    user_conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
-        states={
-            WAITING_FOR_FIRST_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_first_name)],
-            WAITING_FOR_SURNAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_surname)]
-        },
-        fallbacks=[CommandHandler('cancel', cancel)]
-    )
+    # Простой обработчик текста
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_simple_text))
 
-    # ConversationHandler для пользователей (покупка товаров)
-    user_buy_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🛍️ Магазин$'), shop)],
-        states={
-            USER_BUY_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_product)],
-            USER_CONFIRM_PURCHASE: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_purchase)]
-        },
-        fallbacks=[CommandHandler('cancel', cancel)]
-    )
-
-    # ConversationHandler для администратора (добавление баллов)
-    admin_points_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^⭐ Добавить баллы$'), admin_add_points_start)],
-        states={
-            ADMIN_SELECT_USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_select_user)],
-            ADMIN_ADD_POINTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_add_points_finish)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для администратора (создание заданий)
-    admin_task_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📝 Создать задание$'), admin_create_task_start)],
-        states={
-            ADMIN_CREATE_TASK: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_task_finish)],
-            ADMIN_SET_TASK_POINTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_task_points)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для администратора (исправление ID)
-    admin_fix_id_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🆔 Исправить ID$'), admin_fix_id_start)],
-        states={
-            ADMIN_FIX_ID_SELECT_USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_fix_id_select_user)],
-            ADMIN_FIX_ID_SET_NEW: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_fix_id_set_new)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для администратора (сброс пользователей)
-    admin_reset_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🗑️ Сбросить пользователей$'), admin_reset_users_start)],
-        states={
-            ADMIN_CONFIRM_RESET: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_reset_users_confirm)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для администратора (проверка заданий)
-    admin_review_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📨 Проверка заданий$'), admin_pending_submissions)],
-        states={
-            ADMIN_REVIEW_SELECT: [
-                MessageHandler(filters.Regex('^🔙 Назад$'), lambda update, context: admin_cancel(update, context)),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_review_submission)
-            ]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для пользователей (отправка заданий)
-    user_task_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
-        states={
-            USER_SUBMIT_TASK: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_finish),
-                MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT,
-                               handle_task_submission)
-            ]
-        },
-        fallbacks=[CommandHandler('cancel', cancel)]
-    )
-
-    # Добавление обработчиков в правильном порядке
-    print("🔄 Добавление обработчиков...")
-    
-    # Сначала ConversationHandler
-    application.add_handler(user_conv_handler)
-    application.add_handler(admin_product_conv_handler)
-    application.add_handler(user_buy_conv_handler)
-    application.add_handler(admin_points_conv_handler)
-    application.add_handler(admin_task_conv_handler)
-    application.add_handler(admin_fix_id_conv_handler)
-    application.add_handler(admin_review_conv_handler)
-    application.add_handler(user_task_conv_handler)
-    application.add_handler(admin_reset_conv_handler)
-    
-    # Затем CallbackQueryHandler
-    application.add_handler(CallbackQueryHandler(handle_submission_callback))
-    
-    # Затем CommandHandler
-    application.add_handler(CommandHandler('start', start))
-    application.add_handler(CommandHandler('admin', admin_panel))
-    
-    # Затем MessageHandler для кнопок
-    application.add_handler(MessageHandler(
-        filters.Regex(
-            r'^(👤 Профиль|🛍️ Магазин|📊 Рейтинг участников|📤 Отправить задание|👨‍💼 Панель администратора|👥 Список пользователей|⭐ Добавить баллы|📝 Создать задание|📋 Список заданий|📨 Проверка заданий|🛍️ Добавить товар|📦 Список товаров|🆔 Исправить ID|🗑️ Сбросить пользователей|📊 Статистика|🔙 Главное меню|🔙 Назад|🔙 Отмена|🛒 Купить товар #\d+|✅ Да, купить товар|❌ Нет, отменить|🔙 Назад к товарам)$'),
-        handle_buttons
-    ))
-    
-    # Последним - обработчик для отладки (ловит все необработанные сообщения)
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, debug_handler))
-    
-    print("✅ Все обработчики добавлены")
-    logger.info("Бот запущен на сервере Railway!")
-    
-    # Запускаем бота (синхронно)
+    print("✅ Базовые обработчики добавлены")
     print("🚀 Запуск polling...")
-    application.run_polling()
+    
+    application.run_polling(
+        poll_interval=1.0,
+        timeout=10,
+        drop_pending_updates=True
+    )
 
 
