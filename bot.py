@@ -2211,9 +2211,8 @@ def main():
 import os
 import asyncio
 
-
-async def main_web():
-    """Функция для запуска на веб-сервере"""
+def main_web():
+    """Функция для запуска на веб-сервере - синхронная версия"""
     # Получаем токен из переменных окружения Railway
     TOKEN = os.environ.get('BOT_TOKEN', '8549336941:AAHUqok5bUKTypT-X8UGtXdkih8CDTNnHJ4')
     
@@ -2336,17 +2335,14 @@ async def main_web():
 
     logger.info("Бот запущен на сервере Railway!")
     
-    # Запускаем бота
-    await application.run_polling()
+    # Запускаем бота (синхронно)
+    application.run_polling()
 
 if __name__ == '__main__':
     # Проверяем, запущен ли код на Railway
     if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_STATIC_URL'):
         print("🚀 Запуск на Railway сервере...")
-        asyncio.run(main_web())
+        main_web()
     else:
         print("💻 Локальный запуск...")
         main()
-
-
-
