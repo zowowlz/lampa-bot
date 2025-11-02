@@ -84,7 +84,6 @@ def generate_product_id(products):
 
     return max_id + 1
 
-
 def load_data(filename):
     """Загрузка данных из файла"""
     try:
@@ -144,19 +143,17 @@ def get_main_keyboard(user_id=None):
 
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-
 def get_admin_keyboard():
     """Клавиатура администратора"""
     keyboard = [
         [KeyboardButton("👥 Список пользователей"), KeyboardButton("⭐ Добавить баллы")],
         [KeyboardButton("📝 Создать задание"), KeyboardButton("📋 Список заданий")],
         [KeyboardButton("📨 Проверка заданий"), KeyboardButton("🛍️ Добавить товар")],
-        [KeyboardButton("📦 Список товаров"), KeyboardButton("🆔 Исправить ID")],
-        [KeyboardButton("🗑️ Сбросить пользователей"), KeyboardButton("📊 Статистика")],
-        [KeyboardButton("🔙 Главное меню")]
+        [KeyboardButton("📦 Список товаров"), KeyboardButton("🗑️ Удалить товар")],
+        [KeyboardButton("🆔 Исправить ID"), KeyboardButton("🗑️ Сбросить пользователей")],
+        [KeyboardButton("📊 Статистика"), KeyboardButton("🔙 Главное меню")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
 
 def is_admin(user_id):
     """Проверка, является ли пользователь администратором"""
@@ -180,7 +177,6 @@ def generate_unique_id(items):
 
     # Находим максимальный ID и возвращаем следующий
     return max(existing_ids) + 1
-
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start"""
@@ -260,7 +256,7 @@ async def register_surname(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Получаем имя из контекста
     first_name = context.user_data.get('first_name')
-
+    
     # Генерируем уникальный ID
     unique_id = generate_unique_id(users)
 
@@ -288,7 +284,7 @@ async def register_surname(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Очищаем контекст
     context.user_data.pop('first_name', None)
-
+    
     return ConversationHandler.END
 
 
@@ -357,7 +353,6 @@ async def show_rating(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=get_main_keyboard(update.effective_user.id)
     )
 
-
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показать профиль пользователя"""
     user_id = str(update.effective_user.id)
@@ -415,11 +410,18 @@ async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     shop_text = f"🛍️ <b>Магазин товаров</b>\n\n💳 <b>Ваш баланс:</b> {user_data['points']} баллов\n\n"
 
     for product_id, product in products.items():
+        quantity_text = "∞" if product.get('quantity', 0) == 0 else f"{product.get('quantity', 0)} шт."
+        available = product.get('quantity', 0) == 0 or product.get('quantity', 0) > product.get('sold', 0)
+
+        status_icon = "✅" if available else "❌"
+        status_text = "Доступен" if available else "Нет в наличии"
+
         shop_text += (
-            f"🎁 <b>Товар #{product_id}</b>\n"
+            f"{status_icon} <b>Товар #{product_id}</b> - {status_text}\n"
             f"📦 {product['name']}\n"
             f"📝 {product['description']}\n"
             f"💰 Цена: {product['price']} баллов\n"
+            f"📦 В наличии: {quantity_text}\n"
             f"────────────────────\n"
         )
 
@@ -428,7 +430,18 @@ async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Создаем клавиатуру с товарами
     keyboard = []
     for product_id, product in products.items():
-        keyboard.append([KeyboardButton(f"🛒 Купить товар #{product_id}")])
+        available = product.get('quantity', 0) == 0 or product.get('quantity', 0) > product.get('sold', 0)
+        if available:
+            keyboard.append([KeyboardButton(f"🛒 Купить товар #{product_id}")])
+
+    if not keyboard:
+        shop_text = "🛍️ <b>Магазин</b>\n\n❌ На данный момент все товары распроданы."
+        await update.message.reply_text(
+            shop_text,
+            parse_mode='HTML',
+            reply_markup=get_main_keyboard(update.effective_user.id)
+        )
+        return ConversationHandler.END
 
     keyboard.append([KeyboardButton("🔙 Назад")])
 
@@ -439,8 +452,6 @@ async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     return USER_BUY_PRODUCT
-
-
 async def submit_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начало отправки задания"""
     user_id = str(update.effective_user.id)
@@ -566,16 +577,30 @@ async def buy_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = users[user_id]
     product = products[product_id]
 
+    # Проверяем доступность товара
+    available = product.get('quantity', 0) == 0 or product.get('quantity', 0) > product.get('sold', 0)
+    if not available:
+        await update.message.reply_text(
+            "❌ Этот товар закончился.",
+            reply_markup=get_main_keyboard(update.effective_user.id)
+        )
+        return ConversationHandler.END
+
     # Сохраняем выбранный товар в контексте
     context.user_data['selected_product'] = product
     context.user_data['selected_product_id'] = product_id
 
     # Показываем подтверждение покупки
+    quantity_text = "без ограничений" if product.get('quantity', 0) == 0 else f"{product.get('quantity', 0)} шт."
+    remaining = product.get('quantity', 0) - product.get('sold', 0) if product.get('quantity', 0) > 0 else "∞"
+
     confirmation_text = (
         f"🛒 <b>Подтверждение покупки</b>\n\n"
         f"🎁 <b>Товар:</b> {product['name']}\n"
         f"📝 <b>Описание:</b> {product['description']}\n"
-        f"💰 <b>Цена:</b> {product['price']} баллов\n\n"
+        f"💰 <b>Цена:</b> {product['price']} баллов\n"
+        f"📦 <b>В наличии:</b> {quantity_text}\n"
+        f"🔢 <b>Осталось:</b> {remaining} шт.\n\n"
         f"💳 <b>Ваш баланс:</b> {user_data['points']} баллов\n"
         f"🔮 <b>Останется после покупки:</b> {user_data['points'] - product['price']} баллов\n\n"
         f"<b>Вы уверены, что хотите купить этот товар?</b>"
@@ -596,6 +621,141 @@ async def buy_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return USER_CONFIRM_PURCHASE
 
 
+async def confirm_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка подтверждения покупки"""
+    text = update.message.text
+
+    if text == "🔙 Назад к товарам":
+        return await shop(update, context)
+
+    if text in ["❌ Нет, отменить", "🔙 Назад"]:
+        await update.message.reply_text(
+            "❌ Покупка отменена.",
+            reply_markup=get_main_keyboard(update.effective_user.id)
+        )
+        return ConversationHandler.END
+
+    if text != "✅ Да, купить товар":
+        await update.message.reply_text(
+            "❌ Неизвестная команда. Пожалуйста, используйте кнопки для подтверждения.",
+            reply_markup=get_main_keyboard(update.effective_user.id)
+        )
+        return USER_CONFIRM_PURCHASE
+
+    # Получаем сохраненный товар из контекста
+    product = context.user_data.get('selected_product')
+    product_id = context.user_data.get('selected_product_id')
+
+    if not product or not product_id:
+        await update.message.reply_text(
+            "❌ Ошибка: товар не найден.",
+            reply_markup=get_main_keyboard(update.effective_user.id)
+        )
+        return ConversationHandler.END
+
+    user_id = str(update.effective_user.id)
+    users = load_users()
+    products = load_products()
+
+    # Обновляем данные товара (на случай изменений)
+    if product_id not in products:
+        await update.message.reply_text(
+            "❌ Товар больше не доступен.",
+            reply_markup=get_main_keyboard(update.effective_user.id)
+        )
+        return ConversationHandler.END
+
+    product = products[product_id]
+    user_data = users[user_id]
+
+    # Проверяем доступность товара еще раз
+    available = product.get('quantity', 0) == 0 or product.get('quantity', 0) > product.get('sold', 0)
+    if not available:
+        await update.message.reply_text(
+            "❌ Этот товар закончился.",
+            reply_markup=get_main_keyboard(update.effective_user.id)
+        )
+        return ConversationHandler.END
+
+    # Проверяем достаточно ли баллов
+    if user_data['points'] < product['price']:
+        await update.message.reply_text(
+            f"❌ <b>Недостаточно баллов!</b>\n\n"
+            f"💰 Стоимость товара: {product['price']} баллов\n"
+            f"💳 Ваш баланс: {user_data['points']} баллов\n"
+            f"🔻 Не хватает: {product['price'] - user_data['points']} баллов\n\n"
+            f"Пополните баланс и попробуйте снова!",
+            parse_mode='HTML',
+            reply_markup=get_main_keyboard(update.effective_user.id)
+        )
+        return ConversationHandler.END
+
+    # Списываем баллы
+    users[user_id]['points'] -= product['price']
+    save_users(users)
+
+    # Обновляем количество товара
+    if product.get('quantity', 0) > 0:
+        products[product_id]['sold'] = products[product_id].get('sold', 0) + 1
+    save_products(products)
+
+    # Создаем заказ
+    orders = load_orders()
+    order_id = generate_unique_id(orders)
+
+    orders[order_id] = {
+        'user_id': user_id,
+        'user_name': f"{user_data['first_name']} {user_data['surname']}",
+        'user_unique_id': user_data['unique_id'],
+        'product_id': product_id,
+        'product_name': product['name'],
+        'product_description': product['description'],
+        'price': product['price'],
+        'order_time': datetime.now().isoformat(),
+        'status': 'completed'
+    }
+    save_orders(orders)
+
+    # Уведомляем администраторов
+    for admin_id in ADMIN_IDS:
+        try:
+            remaining = "∞" if product.get('quantity', 0) == 0 else product.get('quantity', 0) - products[product_id][
+                'sold']
+            await context.bot.send_message(
+                chat_id=admin_id,
+                text=f"🛒 <b>Новая покупка!</b>\n\n"
+                     f"👤 <b>Покупатель:</b> {user_data['first_name']} {user_data['surname']} (ID: #{user_data['unique_id']})\n"
+                     f"🎁 <b>Товар:</b> {product['name']}\n"
+                     f"💰 <b>Цена:</b> {product['price']} баллов\n"
+                     f"📦 <b>Осталось:</b> {remaining} шт.\n"
+                     f"🆔 <b>Заказ #:</b> {order_id}\n"
+                     f"🕒 <b>Время:</b> {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                parse_mode='HTML'
+            )
+        except Exception as e:
+            logger.error(f"Не удалось отправить уведомление администратору {admin_id}: {e}")
+
+    remaining_text = "∞" if product.get('quantity', 0) == 0 else product.get('quantity', 0) - products[product_id][
+        'sold']
+
+    await update.message.reply_text(
+        f"🎉 <b>Поздравляем с покупкой!</b>\n\n"
+        f"🎁 <b>Товар:</b> {product['name']}\n"
+        f"📝 <b>Описание:</b> {product['description']}\n"
+        f"💰 <b>Списано:</b> {product['price']} баллов\n"
+        f"💳 <b>Остаток на балансе:</b> {users[user_id]['points']} баллов\n"
+        f"📦 <b>Осталось товара:</b> {remaining_text} шт.\n"
+        f"🆔 <b>Номер заказа:</b> #{order_id}\n\n"
+        f"Спасибо за покупку! 🎊",
+        parse_mode='HTML',
+        reply_markup=get_main_keyboard(update.effective_user.id)
+    )
+
+    # Очищаем контекст
+    context.user_data.pop('selected_product', None)
+    context.user_data.pop('selected_product_id', None)
+
+    return ConversationHandler.END
 async def confirm_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка подтверждения покупки"""
     text = update.message.text
@@ -699,7 +859,10 @@ async def confirm_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop('selected_product_id', None)
 
     return ConversationHandler.END
-
+# Убедитесь, что эти состояния есть в начале файла
+ADMIN_CREATE_PRODUCT_NAME = 1
+ADMIN_CREATE_PRODUCT_DESCRIPTION = 2
+ADMIN_CREATE_PRODUCT_PRICE = 3
 
 async def admin_create_product_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начало создания товара"""
@@ -709,6 +872,10 @@ async def admin_create_product_start(update: Update, context: ContextTypes.DEFAU
         await update.message.reply_text("❌ У вас нет доступа.")
         return ConversationHandler.END
 
+    # Очищаем контекст
+    context.user_data.pop('product_name', None)
+    context.user_data.pop('product_description', None)
+
     await update.message.reply_text(
         "🛍️ <b>Добавление нового товара</b>\n\n"
         "Введите название товара:",
@@ -716,11 +883,11 @@ async def admin_create_product_start(update: Update, context: ContextTypes.DEFAU
         reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
     )
 
-    return ADMIN_CREATE_PRODUCT
+    return ADMIN_CREATE_PRODUCT_NAME
 
 
-async def admin_create_product_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Завершение создания товара - установка описания"""
+async def admin_create_product_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка названия товара"""
     text = update.message.text
 
     if text == "🔙 Отмена":
@@ -734,17 +901,42 @@ async def admin_create_product_finish(update: Update, context: ContextTypes.DEFA
     context.user_data['product_name'] = text
 
     await update.message.reply_text(
-        f"📦 <b>Название товара:</b>\n{text}\n\n"
+        f"📦 <b>Название товара:</b> {text}\n\n"
         "Теперь введите описание товара:",
         parse_mode='HTML',
         reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
     )
 
-    return ADMIN_SET_PRODUCT_PRICE
+    return ADMIN_CREATE_PRODUCT_DESCRIPTION
 
 
-async def admin_save_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Сохранение товара"""
+async def admin_create_product_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка описания товара"""
+    text = update.message.text
+
+    if text == "🔙 Отмена":
+        await update.message.reply_text(
+            "❌ Добавление товара отменено.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
+
+    # Сохраняем описание товара
+    context.user_data['product_description'] = text
+
+    await update.message.reply_text(
+        f"📦 <b>Название товара:</b> {context.user_data['product_name']}\n"
+        f"📝 <b>Описание:</b> {text}\n\n"
+        "Теперь введите цену товара в баллах:",
+        parse_mode='HTML',
+        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
+    )
+
+    return ADMIN_CREATE_PRODUCT_PRICE
+
+
+async def admin_create_product_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка цены товара и запрос количества"""
     text = update.message.text
 
     if text == "🔙 Отмена":
@@ -760,15 +952,62 @@ async def admin_save_product(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await update.message.reply_text(
                 "❌ Цена должна быть положительным числом. Попробуйте еще раз:"
             )
-            return ADMIN_SET_PRODUCT_PRICE
+            return ADMIN_CREATE_PRODUCT_PRICE
     except ValueError:
         await update.message.reply_text(
             "❌ Пожалуйста, введите целое число. Попробуйте еще раз:"
         )
-        return ADMIN_SET_PRODUCT_PRICE
+        return ADMIN_CREATE_PRODUCT_PRICE
+
+    # Сохраняем цену
+    context.user_data['product_price'] = price
+
+    await update.message.reply_text(
+        f"📦 <b>Название товара:</b> {context.user_data['product_name']}\n"
+        f"📝 <b>Описание:</b> {context.user_data['product_description']}\n"
+        f"💰 <b>Цена:</b> {price} баллов\n\n"
+        "Теперь введите количество товара (0 - без ограничений):",
+        parse_mode='HTML',
+        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
+    )
+
+    return ADMIN_SET_PRODUCT_QUANTITY
+
+
+async def admin_set_product_quantity(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Установка количества товара и сохранение"""
+    text = update.message.text
+
+    if text == "🔙 Отмена":
+        await update.message.reply_text(
+            "❌ Добавление товара отменено.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
+
+    try:
+        quantity = int(text)
+        if quantity < 0:
+            await update.message.reply_text(
+                "❌ Количество не может быть отрицательным. Попробуйте еще раз:"
+            )
+            return ADMIN_SET_PRODUCT_QUANTITY
+    except ValueError:
+        await update.message.reply_text(
+            "❌ Пожалуйста, введите целое число. Попробуйте еще раз:"
+        )
+        return ADMIN_SET_PRODUCT_QUANTITY
 
     product_name = context.user_data.get('product_name')
     product_description = context.user_data.get('product_description')
+    product_price = context.user_data.get('product_price')
+
+    if not product_name or not product_description or product_price is None:
+        await update.message.reply_text(
+            "❌ Ошибка: данные товара не найдены. Начните заново.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
 
     # Сохраняем товар
     products = load_products()
@@ -777,18 +1016,28 @@ async def admin_save_product(update: Update, context: ContextTypes.DEFAULT_TYPE)
     products[product_id] = {
         'name': product_name,
         'description': product_description,
-        'price': price,
+        'price': product_price,
+        'quantity': quantity,
+        'sold': 0,  # Количество проданных товаров
         'created_at': datetime.now().isoformat(),
         'created_by': update.effective_user.id
     }
     save_products(products)
+
+    # Очищаем контекст
+    context.user_data.pop('product_name', None)
+    context.user_data.pop('product_description', None)
+    context.user_data.pop('product_price', None)
+
+    quantity_text = "без ограничений" if quantity == 0 else f"{quantity} шт."
 
     await update.message.reply_text(
         f"✅ <b>Товар успешно добавлен!</b>\n\n"
         f"📦 Товар #{product_id}\n"
         f"🎁 Название: {product_name}\n"
         f"📝 Описание: {product_description}\n"
-        f"💰 Цена: {price} баллов\n\n"
+        f"💰 Цена: {product_price} баллов\n"
+        f"📦 Количество: {quantity_text}\n\n"
         f"Теперь пользователи могут покупать этот товар!",
         parse_mode='HTML',
         reply_markup=get_admin_keyboard()
@@ -796,6 +1045,140 @@ async def admin_save_product(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     return ConversationHandler.END
 
+
+async def admin_delete_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Удаление товара с inline кнопками"""
+    user_id = update.effective_user.id
+
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ У вас нет доступа.")
+        return
+
+    products = load_products()
+
+    if not products:
+        await update.message.reply_text(
+            "📭 Товаров для удаления нет.",
+            reply_markup=get_admin_keyboard()
+        )
+        return
+
+    # Создаем inline клавиатуру с товарами
+    keyboard = []
+    for product_id, product in products.items():
+        quantity_text = "∞" if product.get('quantity', 0) == 0 else f"{product.get('quantity', 0)} шт."
+        button_text = f"#{product_id} - {product['name'][:20]} ({quantity_text})"
+        keyboard.append([InlineKeyboardButton(button_text, callback_data=f"delete_product_{product_id}")])
+
+    keyboard.append([InlineKeyboardButton("🔙 Отмена", callback_data="delete_cancel")])
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "🗑️ <b>Удаление товара</b>\n\n"
+        "Выберите товар для удаления:",
+        parse_mode='HTML',
+        reply_markup=reply_markup
+    )
+
+
+async def handle_delete_product_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка callback для удаления товара"""
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data
+
+    if data == "delete_cancel":
+        await query.edit_message_text(
+            "❌ Удаление товара отменено.",
+            reply_markup=get_admin_keyboard()
+        )
+        return
+
+    if data.startswith("delete_product_"):
+        product_id = data.split('_')[2]
+
+        products = load_products()
+
+        if product_id not in products:
+            await query.edit_message_text(
+                "❌ Товар не найден.",
+                reply_markup=get_admin_keyboard()
+            )
+            return
+
+        product = products[product_id]
+        quantity_text = "без ограничений" if product.get('quantity', 0) == 0 else f"{product.get('quantity', 0)} шт."
+
+        # Создаем клавиатуру для подтверждения удаления
+        keyboard = [
+            [
+                InlineKeyboardButton("✅ Да, удалить", callback_data=f"confirm_delete_{product_id}"),
+                InlineKeyboardButton("❌ Отменить", callback_data="delete_cancel_final")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(
+            f"⚠️ <b>Подтверждение удаления</b>\n\n"
+            f"📦 Товар #{product_id}\n"
+            f"🎁 Название: {product['name']}\n"
+            f"📝 Описание: {product['description']}\n"
+            f"💰 Цена: {product['price']} баллов\n"
+            f"📦 Количество: {quantity_text}\n"
+            f"🛒 Продано: {product.get('sold', 0)} шт.\n\n"
+            f"<b>Вы уверены, что хотите удалить этот товар?</b>\n"
+            f"Эта операция необратима!",
+            parse_mode='HTML',
+            reply_markup=reply_markup
+        )
+
+
+async def handle_confirm_delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка подтверждения удаления товара"""
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data
+
+    if data.startswith("confirm_delete_"):
+        product_id = data.split('_')[2]
+
+        products = load_products()
+
+        if product_id not in products:
+            await query.edit_message_text(
+                "❌ Товар не найден.",
+                reply_markup=get_admin_keyboard()
+            )
+            return
+
+        product_info = products[product_id]
+
+        # Удаляем товар
+        del products[product_id]
+        save_products(products)
+
+        await query.edit_message_text(
+            f"✅ <b>Товар успешно удален!</b>\n\n"
+            f"🗑️ Удален товар #{product_id}\n"
+            f"🎁 Название: {product_info['name']}\n"
+            f"💰 Цена: {product_info['price']} баллов\n\n"
+            f"Товар больше не доступен для покупки.",
+            parse_mode='HTML'
+        )
+
+
+async def handle_delete_cancel_final(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка окончательной отмены удаления"""
+    query = update.callback_query
+    await query.answer()
+
+    await query.edit_message_text(
+        "❌ Удаление товара отменено.",
+        parse_mode='HTML'
+    )
 
 async def admin_products_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Список всех товаров"""
@@ -817,11 +1200,15 @@ async def admin_products_list(update: Update, context: ContextTypes.DEFAULT_TYPE
     products_text = "🛍️ <b>Список товаров:</b>\n\n"
 
     for product_id, product in products.items():
+        quantity_text = "∞" if product.get('quantity', 0) == 0 else f"{product.get('quantity', 0)} шт."
+        sold_text = f" | 🛒 Продано: {product.get('sold', 0)} шт." if product.get('quantity', 0) > 0 else ""
+
         products_text += (
             f"📦 <b>Товар #{product_id}</b>\n"
             f"🎁 {product['name']}\n"
             f"📝 {product['description']}\n"
             f"💰 Цена: {product['price']} баллов\n"
+            f"📦 В наличии: {quantity_text}{sold_text}\n"
             f"📅 Добавлен: {product.get('created_at', 'Неизвестно')[:10]}\n"
             f"────────────────────\n"
         )
@@ -831,7 +1218,6 @@ async def admin_products_list(update: Update, context: ContextTypes.DEFAULT_TYPE
         parse_mode='HTML',
         reply_markup=get_admin_keyboard()
     )
-
 
 async def admin_review_submission(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Просмотр выбранного задания для оценки"""
@@ -928,7 +1314,6 @@ async def admin_review_submission(update: Update, context: ContextTypes.DEFAULT_
     )
 
     return ADMIN_REVIEW_SELECT
-
 
 async def handle_task_submission(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка отправленного задания"""
@@ -1038,7 +1423,6 @@ async def handle_task_submission(update: Update, context: ContextTypes.DEFAULT_T
 
     return ConversationHandler.END
 
-
 async def handle_submission_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка callback от кнопок принятия/отклонения"""
     query = update.callback_query
@@ -1134,20 +1518,17 @@ async def admin_create_product_finish(update: Update, context: ContextTypes.DEFA
         )
         return ConversationHandler.END
 
-    # Сохраняем описание товара
-    context.user_data['product_description'] = text
+    # Сохраняем название товара (это первое сообщение после названия)
+    context.user_data['product_name'] = text
 
     await update.message.reply_text(
-        f"📦 <b>Название товара:</b> {context.user_data['product_name']}\n"
-        f"📝 <b>Описание:</b> {text}\n\n"
-        "Теперь введите цену товара в баллах:",
+        f"📦 <b>Название товара:</b>\n{text}\n\n"
+        "Теперь введите описание товара:",
         parse_mode='HTML',
         reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
     )
 
     return ADMIN_SET_PRODUCT_PRICE
-
-
 async def show_pending_submissions_after_review(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     """Показать список заданий после принятия/отклонения"""
     submissions = load_submissions()
@@ -1216,8 +1597,6 @@ async def admin_pending_submissions(update: Update, context: ContextTypes.DEFAUL
     )
 
     return ADMIN_REVIEW_SELECT
-
-
 # АДМИН ФУНКЦИИ ДЛЯ ЗАДАНИЙ
 
 async def admin_create_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1614,8 +1993,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not is_admin(user_id):
         await update.message.reply_text(
-            "❌ У вас нет доступа к этой команде.",
-            reply_markup=get_main_keyboard(user_id)
+            "❌ У вас нет доступа к этой команде."
         )
         return
 
@@ -1625,6 +2003,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode='HTML',
         reply_markup=get_admin_keyboard()
     )
+
 
 async def admin_users_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Список всех пользователей"""
@@ -1657,8 +2036,9 @@ async def admin_users_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         users_list,
         parse_mode='HTML',
-        reply_markup=get_admin_keyboard()  # Возвращает в админ-панель, а не в главное меню
+        reply_markup=get_admin_keyboard()
     )
+
 
 async def admin_add_points_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начало процесса добавления баллов"""
@@ -1950,7 +2330,6 @@ async def admin_reset_users_confirm(update: Update, context: ContextTypes.DEFAUL
 
     return ConversationHandler.END
 
-
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка нажатий на кнопки"""
     user_id = update.effective_user.id
@@ -1958,7 +2337,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
     # Глобальная обработка кнопок "Назад" и "Отмена"
-    if text in ["🔙 Назад", "🔙 Отмена"]:
+    if text in ["🔙 Назад", "🔙 Отмена", "🔙 Главное меню"]:
         if is_admin(user_id):
             await update.message.reply_text(
                 "🔙 Возврат в меню администратора.",
@@ -1969,14 +2348,6 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "🔙 Возврат в главное меню.",
                 reply_markup=get_main_keyboard(user_id)
             )
-        return
-
-    # Обработка кнопки "Главное меню" - всегда возвращает в главное меню
-    if text == "🔙 Главное меню":
-        await update.message.reply_text(
-            "🔙 Возврат в главное меню.",
-            reply_markup=get_main_keyboard(user_id)
-        )
         return
 
   # Проверка для обычных пользователей
@@ -2333,4 +2704,5 @@ if __name__ == '__main__':
         print("💻 Локальный запуск...")
         main()
 if __name__ == '__main__':
+
     main()
