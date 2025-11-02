@@ -2557,8 +2557,7 @@ def main_web():
     """Функция для запуска на веб-сервере"""
     # Получаем токен из переменных окружения Railway
     TOKEN = os.environ.get('BOT_TOKEN', '8549336941:AAHUqok5bUKTypT-X8UGtXdkih8CDTNnHJ4')
-
-application = Application.builder().token(TOKEN).build()
+   application = Application.builder().token(TOKEN).build()
 
     # ConversationHandler для регистрации пользователей
     user_conv_handler = ConversationHandler(
@@ -2572,7 +2571,7 @@ application = Application.builder().token(TOKEN).build()
 
     # ConversationHandler для администратора (добавление товаров)
     admin_product_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
+        entry_points=[MessageHandler(filters.Regex('⚠️ добавить товар$'), admin_create_product_start)],
         states={
             ADMIN_CREATE_PRODUCT_NAME: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_name)
@@ -2706,3 +2705,4 @@ if __name__ == '__main__':
 if __name__ == '__main__':
 
     main()
+
