@@ -2336,21 +2336,6 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     users = load_users()
     text = update.message.text
 
-
-# Обработка универсальных кнопок "Назад"/"Отмена"
-if text in ["🔙 Назад", "🔙 Отмена"]:
-    if is_admin(user_id):
-        await update.message.reply_text(
-            "🔙 Возврат в меню администратора.",
-            reply_markup=get_admin_keyboard()
-        )
-    else:
-        await update.message.reply_text(
-            "🔙 Возврат в главное меню.",
-            reply_markup=get_main_keyboard(user_id)
-        )
-    return
-
     # Проверка для обычных пользователей
     if str(user_id) not in users and text in ["👤 Профиль", "🛍️ Магазин", "📊 Рейтинг участников", "📤 Отправить задание", "👨‍💼 Панель администратора"]:
         await update.message.reply_text(
