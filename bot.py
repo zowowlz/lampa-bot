@@ -2212,14 +2212,15 @@ import os
 import asyncio
 
 
-def main_web():
+async def main_web():
     """Функция для запуска на веб-сервере"""
     # Получаем токен из переменных окружения Railway
     TOKEN = os.environ.get('BOT_TOKEN', '8549336941:AAHUqok5bUKTypT-X8UGtXdkih8CDTNnHJ4')
-
-    # Создаем application так же, как в оригинальной функции main()
+    
+    # Создаем application
     application = Application.builder().token(TOKEN).build()
 
+    # Добавляем все обработчики (как в оригинальной функции main())
     # ConversationHandler для регистрации пользователей
     user_conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
@@ -2235,6 +2236,7 @@ def main_web():
         entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
         states={
             ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_finish)],
+            ADMIN_SET_PRODUCT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_product_description)],
             ADMIN_SET_PRODUCT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)]
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
@@ -2316,13 +2318,13 @@ def main_web():
 
     # Добавление обработчиков
     application.add_handler(user_conv_handler)
-    application.add_handler(admin_product_conv_handler)  # ДОБАВЬТЕ ЭТУ СТРОКУ В НАЧАЛО
-    application.add_handler(admin_points_conv_handler)
-    application.add_handler(admin_task_conv_handler)
-    application.add_handler(admin_review_conv_handler)
-    application.add_handler(user_task_conv_handler)
     application.add_handler(admin_product_conv_handler)
     application.add_handler(user_buy_conv_handler)
+    application.add_handler(admin_points_conv_handler)
+    application.add_handler(admin_task_conv_handler)
+    application.add_handler(admin_fix_id_conv_handler)
+    application.add_handler(admin_review_conv_handler)
+    application.add_handler(user_task_conv_handler)
     application.add_handler(admin_reset_conv_handler)
     application.add_handler(CallbackQueryHandler(handle_submission_callback))
     application.add_handler(CommandHandler('admin', admin_panel))
@@ -2333,20 +2335,18 @@ def main_web():
     ))
 
     logger.info("Бот запущен на сервере Railway!")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
-
+    
+    # Запускаем бота
+    await application.run_polling()
 
 if __name__ == '__main__':
     # Проверяем, запущен ли код на Railway
     if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_STATIC_URL'):
         print("🚀 Запуск на Railway сервере...")
-        main_web()
+        asyncio.run(main_web())
     else:
         print("💻 Локальный запуск...")
         main()
-if __name__ == '__main__':
-
-    main()
 
 
 
