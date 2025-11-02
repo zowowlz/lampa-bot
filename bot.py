@@ -2088,26 +2088,26 @@ def main():
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
- # ConversationHandler для администратора (добавление товаров)
-admin_product_conv_handler = ConversationHandler(
-    entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
-    states={
-        ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_finish)],
-        ADMIN_SET_PRODUCT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_product_description)],
-        ADMIN_SET_PRODUCT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)]
-    },
-    fallbacks=[CommandHandler('cancel', admin_cancel)]
-)
+    # ConversationHandler для администратора (добавление товаров)
+    admin_product_conv_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
+        states={
+            ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_finish)],
+            ADMIN_SET_PRODUCT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_product_description)],
+            ADMIN_SET_PRODUCT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)]
+        },
+        fallbacks=[CommandHandler('cancel', admin_cancel)]
+    )
 
-# ConversationHandler для пользователей (покупка товаров)
-user_buy_conv_handler = ConversationHandler(
-    entry_points=[MessageHandler(filters.Regex('^🛍️ Магазин$'), shop)],
-    states={
-        USER_BUY_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_product)],
-        USER_CONFIRM_PURCHASE: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_purchase)]
-    },
-    fallbacks=[CommandHandler('cancel', cancel)]
-)
+    # ConversationHandler для пользователей (покупка товаров)
+    user_buy_conv_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.Regex('^🛍️ Магазин$'), shop)],
+        states={
+            USER_BUY_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_product)],
+            USER_CONFIRM_PURCHASE: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_purchase)]
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
 
     # ConversationHandler для администратора (добавление баллов)
     admin_points_conv_handler = ConversationHandler(
@@ -2138,6 +2138,7 @@ user_buy_conv_handler = ConversationHandler(
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
+
     # ConversationHandler для администратора (сброс пользователей)
     admin_reset_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex('^🗑️ Сбросить пользователей$'), admin_reset_users_start)],
@@ -2146,6 +2147,7 @@ user_buy_conv_handler = ConversationHandler(
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
+
     # ConversationHandler для администратора (проверка заданий)
     admin_review_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex('^📨 Проверка заданий$'), admin_pending_submissions)],
@@ -2191,7 +2193,6 @@ user_buy_conv_handler = ConversationHandler(
 
     logger.info("Бот запущен!")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
-
 
 import os
 import asyncio
@@ -2332,4 +2333,5 @@ if __name__ == '__main__':
 if __name__ == '__main__':
 
     main()
+
 
