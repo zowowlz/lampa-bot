@@ -702,7 +702,7 @@ async def confirm_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def admin_create_product_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начало создания товара"""
     user_id = update.effective_user.id
-    logger.info(f"Админ {user_id} начал добавление товара")
+    logger.info(f"🚀 Админ {user_id} начал добавление товара - состояние ADMIN_CREATE_PRODUCT")
 
     if not is_admin(user_id):
         await update.message.reply_text("❌ У вас нет доступа.")
@@ -720,7 +720,7 @@ async def admin_create_product_start(update: Update, context: ContextTypes.DEFAU
 async def admin_create_product_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка названия товара"""
     text = update.message.text
-    logger.info(f"Получено название товара: {text}")
+    logger.info(f"📦 Получено название товара: '{text}' - состояние ADMIN_SET_PRODUCT_DESCRIPTION")
 
     if text == "🔙 Отмена":
         await update.message.reply_text(
@@ -731,7 +731,7 @@ async def admin_create_product_finish(update: Update, context: ContextTypes.DEFA
 
     # Сохраняем название товара
     context.user_data['product_name'] = text
-    logger.info(f"Сохранено название товара: {text}")
+    logger.info(f"✅ Сохранено название товара: {text}")
 
     await update.message.reply_text(
         f"📦 <b>Название товара:</b> {text}\n\n"
@@ -745,7 +745,7 @@ async def admin_create_product_finish(update: Update, context: ContextTypes.DEFA
 async def admin_set_product_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка описания товара"""
     text = update.message.text
-    logger.info(f"Получено описание товара: {text}")
+    logger.info(f"📝 Получено описание товара: '{text}' - состояние ADMIN_SET_PRODUCT_PRICE")
 
     if text == "🔙 Отмена":
         await update.message.reply_text(
@@ -756,7 +756,7 @@ async def admin_set_product_description(update: Update, context: ContextTypes.DE
 
     # Сохраняем описание товара
     context.user_data['product_description'] = text
-    logger.info(f"Сохранено описание товара: {text}")
+    logger.info(f"✅ Сохранено описание товара: {text}")
 
     await update.message.reply_text(
         f"📦 <b>Название товара:</b> {context.user_data['product_name']}\n"
@@ -771,7 +771,7 @@ async def admin_set_product_description(update: Update, context: ContextTypes.DE
 async def admin_save_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Сохранение товара с ценой"""
     text = update.message.text
-    logger.info(f"Получена цена товара: {text}")
+    logger.info(f"💰 Получена цена товара: '{text}' - сохранение товара")
 
     if text == "🔙 Отмена":
         await update.message.reply_text(
@@ -797,7 +797,7 @@ async def admin_save_product(update: Update, context: ContextTypes.DEFAULT_TYPE)
     product_description = context.user_data.get('product_description')
 
     if not product_name or not product_description:
-        logger.error("Не найдены данные товара в контексте")
+        logger.error("❌ Не найдены данные товара в контексте")
         await update.message.reply_text(
             "❌ Ошибка: данные товара не найдены. Начните заново.",
             reply_markup=get_admin_keyboard()
@@ -817,7 +817,7 @@ async def admin_save_product(update: Update, context: ContextTypes.DEFAULT_TYPE)
     }
     save_products(products)
 
-    logger.info(f"Товар успешно добавлен: {product_name} (ID: {product_id})")
+    logger.info(f"🎉 Товар успешно добавлен: {product_name} (ID: {product_id}, Цена: {price})")
 
     await update.message.reply_text(
         f"✅ <b>Товар успешно добавлен!</b>\n\n"
@@ -835,7 +835,6 @@ async def admin_save_product(update: Update, context: ContextTypes.DEFAULT_TYPE)
     context.user_data.pop('product_description', None)
 
     return ConversationHandler.END
-
 async def admin_products_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Список всех товаров"""
     user_id = update.effective_user.id
@@ -2230,16 +2229,17 @@ def main_web():
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
-    # ConversationHandler для администратора (добавление товаров)
-    admin_product_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
-        states={
-            ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_finish)],
-            ADMIN_SET_PRODUCT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_product_description)],
-            ADMIN_SET_PRODUCT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
+# ConversationHandler для администратора (добавление товаров)
+admin_product_conv_handler = ConversationHandler(
+    entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
+    states={
+        ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_finish)],
+        ADMIN_SET_PRODUCT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_product_description)],
+        ADMIN_SET_PRODUCT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)]
+    },
+    fallbacks=[CommandHandler('cancel', admin_cancel)],
+    name="admin_product_conversation"
+)
 
     # ConversationHandler для пользователей (покупка товаров)
     user_buy_conv_handler = ConversationHandler(
@@ -2316,10 +2316,12 @@ def main_web():
     )
 
     # Добавление обработчиков
-    application.add_handler(user_conv_handler)
-    application.add_handler(admin_product_conv_handler)
-    application.add_handler(user_buy_conv_handler)
-    application.add_handler(admin_points_conv_handler)
+# Добавление обработчиков
+application.add_handler(admin_product_conv_handler)  # ПЕРВЫМ!
+application.add_handler(user_conv_handler)
+application.add_handler(user_buy_conv_handler)
+application.add_handler(admin_points_conv_handler)
+# ... остальные обработчики
     application.add_handler(admin_task_conv_handler)
     application.add_handler(admin_fix_id_conv_handler)
     application.add_handler(admin_review_conv_handler)
@@ -2346,3 +2348,4 @@ if __name__ == '__main__':
     else:
         print("💻 Локальный запуск...")
         main()
+
