@@ -31,11 +31,14 @@ USER_SUBMIT_TASK = 1
 ADMIN_FIX_ID_SELECT_USER = 1
 ADMIN_FIX_ID_SET_NEW = 2
 ADMIN_REVIEW_SELECT = 1
-ADMIN_CREATE_PRODUCT = 1
-ADMIN_SET_PRODUCT_PRICE = 2
+ADMIN_CREATE_PRODUCT_NAME = 3
+ADMIN_CREATE_PRODUCT_DESCRIPTION = 4
+ADMIN_CREATE_PRODUCT_PRICE = 5
 USER_BUY_PRODUCT = 1
 USER_CONFIRM_PURCHASE = 2
 ADMIN_CONFIRM_RESET = 1
+ADMIN_DELETE_PRODUCT = 6
+ADMIN_SET_PRODUCT_QUANTITY = 7
 
 # Файлы для хранения данных
 DATA_FILE = 'users_data.json'
@@ -1976,7 +1979,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Проверка для обычных пользователей
+  # Проверка для обычных пользователей
     if str(user_id) not in users and text in ["👤 Профиль", "🛍️ Магазин", "📊 Рейтинг участников", "📤 Отправить задание", "👨‍💼 Панель администратора"]:
         await update.message.reply_text(
             "❌ Вы не зарегистрированы. Используйте команду /start для регистрации."
@@ -2014,18 +2017,10 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await admin_fix_id_start(update, context)
     elif text == "🗑️ Сбросить пользователей":
         await admin_reset_users_start(update, context)
+    elif text == "🗑️ Удалить товар":
+        await admin_delete_product(update, context)
     elif text == "📊 Статистика":
         await admin_stats(update, context)
-
-async def admin_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отмена действий администратора"""
-    await update.message.reply_text(
-        "❌ Действие отменено.",
-        reply_markup=get_admin_keyboard()
-    )
-    return ConversationHandler.END
-
-
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Отмена для пользователей"""
     await update.message.reply_text(
@@ -2033,7 +2028,6 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=get_main_keyboard(update.effective_user.id)
     )
     return ConversationHandler.END
-
 
 async def admin_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Отмена действий администратора"""
@@ -2050,7 +2044,7 @@ def main():
 
     application = Application.builder().token(TOKEN).build()
 
-    # ConversationHandler для регистрации пользователей (с раздельным вводом имени и фамилии)
+    # ConversationHandler для регистрации пользователей
     user_conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
@@ -2064,8 +2058,18 @@ def main():
     admin_product_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
         states={
-            ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_finish)],
-            ADMIN_SET_PRODUCT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)]
+            ADMIN_CREATE_PRODUCT_NAME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_name)
+            ],
+            ADMIN_CREATE_PRODUCT_DESCRIPTION: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_description)
+            ],
+            ADMIN_CREATE_PRODUCT_PRICE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_price)
+            ],
+            ADMIN_SET_PRODUCT_QUANTITY: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_product_quantity)
+            ]
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
@@ -2109,6 +2113,7 @@ def main():
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
+
     # ConversationHandler для администратора (сброс пользователей)
     admin_reset_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex('^🗑️ Сбросить пользователей$'), admin_reset_users_start)],
@@ -2117,6 +2122,7 @@ def main():
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
+
     # ConversationHandler для администратора (проверка заданий)
     admin_review_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex('^📨 Проверка заданий$'), admin_pending_submissions)],
@@ -2152,17 +2158,25 @@ def main():
     application.add_handler(admin_product_conv_handler)
     application.add_handler(user_buy_conv_handler)
     application.add_handler(admin_reset_conv_handler)
+
+    # В функции main() замените обработчики удаления товара на:
+    application.add_handler(MessageHandler(filters.Regex('^🗑️ Удалить товар$'), admin_delete_product))
+    application.add_handler(CallbackQueryHandler(handle_delete_product_callback, pattern='^delete_product_'))
+    application.add_handler(CallbackQueryHandler(handle_confirm_delete_callback, pattern='^confirm_delete_'))
+    application.add_handler(CallbackQueryHandler(handle_delete_cancel_final, pattern='^delete_cancel_final'))
+    application.add_handler(CallbackQueryHandler(handle_delete_product_callback, pattern='^delete_cancel'))
+
+    # Общие обработчики
     application.add_handler(CallbackQueryHandler(handle_submission_callback))
     application.add_handler(CommandHandler('admin', admin_panel))
     application.add_handler(MessageHandler(
         filters.Regex(
-            r'^(👤 Профиль|🛍️ Магазин|📊 Рейтинг участников|📤 Отправить задание|👨‍💼 Панель администратора|👥 Список пользователей|⭐ Добавить баллы|📝 Создать задание|📋 Список заданий|📨 Проверка заданий|🛍️ Добавить товар|📦 Список товаров|🆔 Исправить ID|🗑️ Сбросить пользователей|📊 Статистика|🔙 Главное меню|🔙 Назад|🔙 Отмена|🛒 Купить товар #\d+|✅ Да, купить товар|❌ Нет, отменить|🔙 Назад к товарам)$'),
+            r'^(👤 Профиль|🛍️ Магазин|📊 Рейтинг участников|📤 Отправить задание|👨‍💼 Панель администратора|👥 Список пользователей|⭐ Добавить баллы|📝 Создать задание|📋 Список заданий|📨 Проверка заданий|🛍️ Добавить товар|📦 Список товаров|🗑️ Удалить товар|🆔 Исправить ID|🗑️ Сбросить пользователей|📊 Статистика|🔙 Главное меню|🔙 Назад|🔙 Отмена|🛒 Купить товар #\d+|✅ Да, купить товар|❌ Нет, отменить|🔙 Назад к товарам)$'),
         handle_buttons
     ))
 
     logger.info("Бот запущен!")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
-
 
 import os
 import asyncio
@@ -2173,8 +2187,7 @@ def main_web():
     # Получаем токен из переменных окружения Railway
     TOKEN = os.environ.get('BOT_TOKEN', '8549336941:AAHUqok5bUKTypT-X8UGtXdkih8CDTNnHJ4')
 
-    # Создаем application так же, как в оригинальной функции main()
-    application = Application.builder().token(TOKEN).build()
+application = Application.builder().token(TOKEN).build()
 
     # ConversationHandler для регистрации пользователей
     user_conv_handler = ConversationHandler(
@@ -2190,8 +2203,18 @@ def main_web():
     admin_product_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
         states={
-            ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_finish)],
-            ADMIN_SET_PRODUCT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)]
+            ADMIN_CREATE_PRODUCT_NAME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_name)
+            ],
+            ADMIN_CREATE_PRODUCT_DESCRIPTION: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_description)
+            ],
+            ADMIN_CREATE_PRODUCT_PRICE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_price)
+            ],
+            ADMIN_SET_PRODUCT_QUANTITY: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_product_quantity)
+            ]
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
@@ -2280,11 +2303,20 @@ def main_web():
     application.add_handler(admin_product_conv_handler)
     application.add_handler(user_buy_conv_handler)
     application.add_handler(admin_reset_conv_handler)
+
+    # В функции main() замените обработчики удаления товара на:
+    application.add_handler(MessageHandler(filters.Regex('^🗑️ Удалить товар$'), admin_delete_product))
+    application.add_handler(CallbackQueryHandler(handle_delete_product_callback, pattern='^delete_product_'))
+    application.add_handler(CallbackQueryHandler(handle_confirm_delete_callback, pattern='^confirm_delete_'))
+    application.add_handler(CallbackQueryHandler(handle_delete_cancel_final, pattern='^delete_cancel_final'))
+    application.add_handler(CallbackQueryHandler(handle_delete_product_callback, pattern='^delete_cancel'))
+
+    # Общие обработчики
     application.add_handler(CallbackQueryHandler(handle_submission_callback))
     application.add_handler(CommandHandler('admin', admin_panel))
     application.add_handler(MessageHandler(
         filters.Regex(
-            r'^(👤 Профиль|🛍️ Магазин|📊 Рейтинг участников|📤 Отправить задание|👨‍💼 Панель администратора|👥 Список пользователей|⭐ Добавить баллы|📝 Создать задание|📋 Список заданий|📨 Проверка заданий|🛍️ Добавить товар|📦 Список товаров|🆔 Исправить ID|🗑️ Сбросить пользователей|📊 Статистика|🔙 Главное меню|🔙 Назад|🔙 Отмена|🛒 Купить товар #\d+|✅ Да, купить товар|❌ Нет, отменить|🔙 Назад к товарам)$'),
+            r'^(👤 Профиль|🛍️ Магазин|📊 Рейтинг участников|📤 Отправить задание|👨‍💼 Панель администратора|👥 Список пользователей|⭐ Добавить баллы|📝 Создать задание|📋 Список заданий|📨 Проверка заданий|🛍️ Добавить товар|📦 Список товаров|🗑️ Удалить товар|🆔 Исправить ID|🗑️ Сбросить пользователей|📊 Статистика|🔙 Главное меню|🔙 Назад|🔙 Отмена|🛒 Купить товар #\d+|✅ Да, купить товар|❌ Нет, отменить|🔙 Назад к товарам)$'),
         handle_buttons
     ))
 
