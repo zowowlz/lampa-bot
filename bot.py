@@ -716,8 +716,8 @@ async def admin_create_product_start(update: Update, context: ContextTypes.DEFAU
     return ADMIN_CREATE_PRODUCT
 
 
-async def admin_create_product_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Завершение создания товара - установка описания"""
+async def admin_create_product_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка ввода названия товара"""
     text = update.message.text
 
     if text == "🔙 Отмена":
@@ -740,8 +740,33 @@ async def admin_create_product_finish(update: Update, context: ContextTypes.DEFA
     return ADMIN_SET_PRODUCT_PRICE
 
 
+async def admin_create_product_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка ввода описания товара"""
+    text = update.message.text
+
+    if text == "🔙 Отмена":
+        await update.message.reply_text(
+            "❌ Добавление товара отменено.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
+
+    # Сохраняем описание товара
+    context.user_data['product_description'] = text
+
+    await update.message.reply_text(
+        f"📦 <b>Название товара:</b> {context.user_data['product_name']}\n"
+        f"📝 <b>Описание:</b> {text}\n\n"
+        "Теперь введите цену товара в баллах:",
+        parse_mode='HTML',
+        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
+    )
+
+    return ADMIN_SET_PRODUCT_PRICE
+
+
 async def admin_save_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Сохранение товара"""
+    """Сохранение товара с ценой"""
     text = update.message.text
 
     if text == "🔙 Отмена":
@@ -767,6 +792,13 @@ async def admin_save_product(update: Update, context: ContextTypes.DEFAULT_TYPE)
     product_name = context.user_data.get('product_name')
     product_description = context.user_data.get('product_description')
 
+    if not product_name or not product_description:
+        await update.message.reply_text(
+            "❌ Ошибка: данные товара не найдены. Начните заново.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
+
     # Сохраняем товар
     products = load_products()
     product_id = str(generate_product_id(products))
@@ -780,6 +812,10 @@ async def admin_save_product(update: Update, context: ContextTypes.DEFAULT_TYPE)
     }
     save_products(products)
 
+    # Очищаем контекст
+    context.user_data.pop('product_name', None)
+    context.user_data.pop('product_description', None)
+
     await update.message.reply_text(
         f"✅ <b>Товар успешно добавлен!</b>\n\n"
         f"📦 Товар #{product_id}\n"
@@ -792,43 +828,6 @@ async def admin_save_product(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
 
     return ConversationHandler.END
-
-
-async def admin_products_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Список всех товаров"""
-    user_id = update.effective_user.id
-
-    if not is_admin(user_id):
-        await update.message.reply_text("❌ У вас нет доступа.")
-        return
-
-    products = load_products()
-
-    if not products:
-        await update.message.reply_text(
-            "📭 Товаров пока нет.",
-            reply_markup=get_admin_keyboard()
-        )
-        return
-
-    products_text = "🛍️ <b>Список товаров:</b>\n\n"
-
-    for product_id, product in products.items():
-        products_text += (
-            f"📦 <b>Товар #{product_id}</b>\n"
-            f"🎁 {product['name']}\n"
-            f"📝 {product['description']}\n"
-            f"💰 Цена: {product['price']} баллов\n"
-            f"📅 Добавлен: {product.get('created_at', 'Неизвестно')[:10]}\n"
-            f"────────────────────\n"
-        )
-
-    await update.message.reply_text(
-        products_text,
-        parse_mode='HTML',
-        reply_markup=get_admin_keyboard()
-    )
-
 
 async def admin_review_submission(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Просмотр выбранного задания для оценки"""
@@ -2059,16 +2058,18 @@ def main():
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
-
-    # ConversationHandler для администратора (добавление товаров)
-    admin_product_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
-        states={
-            ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_finish)],
-            ADMIN_SET_PRODUCT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
+   # ConversationHandler для администратора (добавление товаров)
+admin_product_conv_handler = ConversationHandler(
+    entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
+    states={
+        ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_name)],
+        ADMIN_SET_PRODUCT_PRICE: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_description),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)
+        ]
+    },
+    fallbacks=[CommandHandler('cancel', admin_cancel)]
+)
 
     # ConversationHandler для пользователей (покупка товаров)
     user_buy_conv_handler = ConversationHandler(
@@ -2301,4 +2302,5 @@ if __name__ == '__main__':
         print("💻 Локальный запуск...")
         main()
 if __name__ == '__main__':
+
     main()
