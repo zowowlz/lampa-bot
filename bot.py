@@ -2215,8 +2215,12 @@ def main_web():
     # Получаем токен из переменных окружения Railway
     TOKEN = os.environ.get('BOT_TOKEN', '8549336941:AAHUqok5bUKTypT-X8UGtXdkih8CDTNnHJ4')
     
+    print(f"🚀 Запуск бота с токеном: {TOKEN[:10]}...")
+    logger.info(f"Запуск бота с токеном: {TOKEN[:10]}...")
+    
     # Создаем application
     application = Application.builder().token(TOKEN).build()
+    print("✅ Application создан")
 
     # ConversationHandler для администратора (добавление товаров)
     admin_product_conv_handler = ConversationHandler(
@@ -2314,9 +2318,12 @@ def main_web():
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
-    # Добавление обработчиков
-    application.add_handler(admin_product_conv_handler)
+    # Добавление обработчиков в правильном порядке
+    print("🔄 Добавление обработчиков...")
+    
+    # Сначала ConversationHandler
     application.add_handler(user_conv_handler)
+    application.add_handler(admin_product_conv_handler)
     application.add_handler(user_buy_conv_handler)
     application.add_handler(admin_points_conv_handler)
     application.add_handler(admin_task_conv_handler)
@@ -2324,16 +2331,29 @@ def main_web():
     application.add_handler(admin_review_conv_handler)
     application.add_handler(user_task_conv_handler)
     application.add_handler(admin_reset_conv_handler)
+    
+    # Затем CallbackQueryHandler
     application.add_handler(CallbackQueryHandler(handle_submission_callback))
+    
+    # Затем CommandHandler
+    application.add_handler(CommandHandler('start', start))
     application.add_handler(CommandHandler('admin', admin_panel))
+    
+    # Затем MessageHandler для кнопок
     application.add_handler(MessageHandler(
         filters.Regex(
             r'^(👤 Профиль|🛍️ Магазин|📊 Рейтинг участников|📤 Отправить задание|👨‍💼 Панель администратора|👥 Список пользователей|⭐ Добавить баллы|📝 Создать задание|📋 Список заданий|📨 Проверка заданий|🛍️ Добавить товар|📦 Список товаров|🆔 Исправить ID|🗑️ Сбросить пользователей|📊 Статистика|🔙 Главное меню|🔙 Назад|🔙 Отмена|🛒 Купить товар #\d+|✅ Да, купить товар|❌ Нет, отменить|🔙 Назад к товарам)$'),
         handle_buttons
     ))
-
+    
+    # Последним - обработчик для отладки (ловит все необработанные сообщения)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, debug_handler))
+    
+    print("✅ Все обработчики добавлены")
     logger.info("Бот запущен на сервере Railway!")
     
     # Запускаем бота (синхронно)
+    print("🚀 Запуск polling...")
     application.run_polling()
+
 
