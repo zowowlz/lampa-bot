@@ -1,13 +1,13 @@
 import logging
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    Application,
+    Updater,
     CommandHandler,
     MessageHandler,
     ConversationHandler,
-    ContextTypes,
-    filters,
-    CallbackQueryHandler
+    CallbackQueryHandler,
+    Filters,
+    CallbackContext
 )
 import json
 import os
@@ -44,8 +44,8 @@ SUBMISSIONS_FILE = 'submissions_data.json'
 PRODUCTS_FILE = 'products_data.json'
 ORDERS_FILE = 'orders_data.json'
 
-# ID администратора (замените на ваш Telegram ID)
-ADMIN_IDS = [424081501]  # Замените на ваш реальный ID
+# ID администратора
+ADMIN_IDS = [424081501]
 
 
 def load_products():
@@ -2026,7 +2026,7 @@ async def admin_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cancel(update: Update, context: CallbackContext):
     """Отмена для пользователей"""
     await update.message.reply_text(
         "❌ Действие отменено.",
@@ -2034,8 +2034,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return ConversationHandler.END
 
-
-async def admin_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def admin_cancel(update: Update, context: CallbackContext):
     """Отмена действий администратора"""
     await update.message.reply_text(
         "❌ Действие отменено.",
@@ -2045,213 +2044,88 @@ async def admin_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def main():
-    """Запуск бота"""
+    """Локальный запуск бота"""
     TOKEN = '8549336941:AAHUqok5bUKTypT-X8UGtXdkih8CDTNnHJ4'
-
-    application = Application.builder().token(TOKEN).build()
-
-    # ConversationHandler для регистрации пользователей (с раздельным вводом имени и фамилии)
-    user_conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
-        states={
-            WAITING_FOR_FIRST_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_first_name)],
-            WAITING_FOR_SURNAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_surname)]
-        },
-        fallbacks=[CommandHandler('cancel', cancel)]
-    )
-
-    # ConversationHandler для администратора (добавление товаров)
-    admin_product_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
-        states={
-            ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_finish)],
-            ADMIN_SET_PRODUCT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для пользователей (покупка товаров)
-    user_buy_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🛍️ Магазин$'), shop)],
-        states={
-            USER_BUY_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_product)],
-            USER_CONFIRM_PURCHASE: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_purchase)]
-        },
-        fallbacks=[CommandHandler('cancel', cancel)]
-    )
-
-    # ConversationHandler для администратора (добавление баллов)
-    admin_points_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^⭐ Добавить баллы$'), admin_add_points_start)],
-        states={
-            ADMIN_SELECT_USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_select_user)],
-            ADMIN_ADD_POINTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_add_points_finish)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для администратора (создание заданий)
-    admin_task_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📝 Создать задание$'), admin_create_task_start)],
-        states={
-            ADMIN_CREATE_TASK: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_task_finish)],
-            ADMIN_SET_TASK_POINTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_task_points)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для администратора (исправление ID)
-    admin_fix_id_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🆔 Исправить ID$'), admin_fix_id_start)],
-        states={
-            ADMIN_FIX_ID_SELECT_USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_fix_id_select_user)],
-            ADMIN_FIX_ID_SET_NEW: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_fix_id_set_new)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-    # ConversationHandler для администратора (сброс пользователей)
-    admin_reset_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🗑️ Сбросить пользователей$'), admin_reset_users_start)],
-        states={
-            ADMIN_CONFIRM_RESET: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_reset_users_confirm)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-    # ConversationHandler для администратора (проверка заданий)
-    admin_review_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📨 Проверка заданий$'), admin_pending_submissions)],
-        states={
-            ADMIN_REVIEW_SELECT: [
-                MessageHandler(filters.Regex('^🔙 Назад$'), lambda update, context: admin_cancel(update, context)),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_review_submission)
-            ]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
-
-    # ConversationHandler для пользователей (отправка заданий)
-    user_task_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
-        states={
-            USER_SUBMIT_TASK: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_finish),
-                MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT,
-                               handle_task_submission)
-            ]
-        },
-        fallbacks=[CommandHandler('cancel', cancel)]
-    )
-
-    # Добавление обработчиков
-    application.add_handler(user_conv_handler)
-    application.add_handler(admin_points_conv_handler)
-    application.add_handler(admin_task_conv_handler)
-    application.add_handler(admin_fix_id_conv_handler)
-    application.add_handler(admin_review_conv_handler)
-    application.add_handler(user_task_conv_handler)
-    application.add_handler(admin_product_conv_handler)
-    application.add_handler(user_buy_conv_handler)
-    application.add_handler(admin_reset_conv_handler)
-    application.add_handler(CallbackQueryHandler(handle_submission_callback))
-    application.add_handler(CommandHandler('admin', admin_panel))
-    application.add_handler(MessageHandler(
-        filters.Regex(
-            r'^(👤 Профиль|🛍️ Магазин|📊 Рейтинг участников|📤 Отправить задание|👨‍💼 Панель администратора|👥 Список пользователей|⭐ Добавить баллы|📝 Создать задание|📋 Список заданий|📨 Проверка заданий|🛍️ Добавить товар|📦 Список товаров|🆔 Исправить ID|🗑️ Сбросить пользователей|📊 Статистика|🔙 Главное меню|🔙 Назад|🔙 Отмена|🛒 Купить товар #\d+|✅ Да, купить товар|❌ Нет, отменить|🔙 Назад к товарам)$'),
-        handle_buttons
-    ))
-
-    logger.info("Бот запущен!")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
-
-
-import os
-import asyncio
-
-
-def main_web():
-    """Функция для запуска на веб-сервере"""
-    # Получаем токен из переменных окружения Railway
-    TOKEN = os.environ.get('BOT_TOKEN', '8549336941:AAHUqok5bUKTypT-X8UGtXdkih8CDTNnHJ4')
-
-    # Создаем application так же, как в оригинальной функции main()
-    application = Application.builder().token(TOKEN).build()
+    
+    updater = Updater(TOKEN, use_context=True)
+    dispatcher = updater.dispatcher
 
     # ConversationHandler для регистрации пользователей
     user_conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
-            WAITING_FOR_FIRST_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_first_name)],
-            WAITING_FOR_SURNAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_surname)]
+            WAITING_FOR_FIRST_NAME: [MessageHandler(Filters.text & ~Filters.command, register_first_name)],
+            WAITING_FOR_SURNAME: [MessageHandler(Filters.text & ~Filters.command, register_surname)]
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
     # ConversationHandler для администратора (добавление товаров)
     admin_product_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
+        entry_points=[MessageHandler(Filters.regex('^🛍️ Добавить товар$'), admin_create_product_start)],
         states={
-            ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_finish)],
-            ADMIN_SET_PRODUCT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)]
+            ADMIN_CREATE_PRODUCT: [MessageHandler(Filters.text & ~Filters.command, admin_create_product_finish)],
+            ADMIN_SET_PRODUCT_PRICE: [MessageHandler(Filters.text & ~Filters.command, admin_save_product)]
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
 
     # ConversationHandler для пользователей (покупка товаров)
     user_buy_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🛍️ Магазин$'), shop)],
+        entry_points=[MessageHandler(Filters.regex('^🛍️ Магазин$'), shop)],
         states={
-            USER_BUY_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, buy_product)],
-            USER_CONFIRM_PURCHASE: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_purchase)]
+            USER_BUY_PRODUCT: [MessageHandler(Filters.text & ~Filters.command, buy_product)],
+            USER_CONFIRM_PURCHASE: [MessageHandler(Filters.text & ~Filters.command, confirm_purchase)]
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
     # ConversationHandler для администратора (добавление баллов)
     admin_points_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^⭐ Добавить баллы$'), admin_add_points_start)],
+        entry_points=[MessageHandler(Filters.regex('^⭐ Добавить баллы$'), admin_add_points_start)],
         states={
-            ADMIN_SELECT_USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_select_user)],
-            ADMIN_ADD_POINTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_add_points_finish)]
+            ADMIN_SELECT_USER: [MessageHandler(Filters.text & ~Filters.command, admin_select_user)],
+            ADMIN_ADD_POINTS: [MessageHandler(Filters.text & ~Filters.command, admin_add_points_finish)]
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
 
     # ConversationHandler для администратора (создание заданий)
     admin_task_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📝 Создать задание$'), admin_create_task_start)],
+        entry_points=[MessageHandler(Filters.regex('^📝 Создать задание$'), admin_create_task_start)],
         states={
-            ADMIN_CREATE_TASK: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_task_finish)],
-            ADMIN_SET_TASK_POINTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_task_points)]
+            ADMIN_CREATE_TASK: [MessageHandler(Filters.text & ~Filters.command, admin_create_task_finish)],
+            ADMIN_SET_TASK_POINTS: [MessageHandler(Filters.text & ~Filters.command, admin_set_task_points)]
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
 
     # ConversationHandler для администратора (исправление ID)
     admin_fix_id_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🆔 Исправить ID$'), admin_fix_id_start)],
+        entry_points=[MessageHandler(Filters.regex('^🆔 Исправить ID$'), admin_fix_id_start)],
         states={
-            ADMIN_FIX_ID_SELECT_USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_fix_id_select_user)],
-            ADMIN_FIX_ID_SET_NEW: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_fix_id_set_new)]
+            ADMIN_FIX_ID_SELECT_USER: [MessageHandler(Filters.text & ~Filters.command, admin_fix_id_select_user)],
+            ADMIN_FIX_ID_SET_NEW: [MessageHandler(Filters.text & ~Filters.command, admin_fix_id_set_new)]
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
 
     # ConversationHandler для администратора (сброс пользователей)
     admin_reset_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🗑️ Сбросить пользователей$'), admin_reset_users_start)],
+        entry_points=[MessageHandler(Filters.regex('^🗑️ Сбросить пользователей$'), admin_reset_users_start)],
         states={
-            ADMIN_CONFIRM_RESET: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_reset_users_confirm)]
+            ADMIN_CONFIRM_RESET: [MessageHandler(Filters.text & ~Filters.command, admin_reset_users_confirm)]
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
 
     # ConversationHandler для администратора (проверка заданий)
     admin_review_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📨 Проверка заданий$'), admin_pending_submissions)],
+        entry_points=[MessageHandler(Filters.regex('^📨 Проверка заданий$'), admin_pending_submissions)],
         states={
             ADMIN_REVIEW_SELECT: [
-                MessageHandler(filters.Regex('^🔙 Назад$'), lambda update, context: admin_cancel(update, context)),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_review_submission)
+                MessageHandler(Filters.regex('^🔙 Назад$'), lambda update, context: admin_cancel(update, context)),
+                MessageHandler(Filters.text & ~Filters.command, admin_review_submission)
             ]
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
@@ -2259,46 +2133,54 @@ def main_web():
 
     # ConversationHandler для пользователей (отправка заданий)
     user_task_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
+        entry_points=[MessageHandler(Filters.regex('^📤 Отправить задание$'), submit_task_start)],
         states={
             USER_SUBMIT_TASK: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_finish),
-                MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT,
-                               handle_task_submission)
+                MessageHandler(Filters.text & ~Filters.command, submit_task_finish),
+                MessageHandler(Filters.photo | Filters.document | Filters.video | Filters.text, handle_task_submission)
             ]
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
     # Добавление обработчиков
-    application.add_handler(user_conv_handler)
-    application.add_handler(admin_points_conv_handler)
-    application.add_handler(admin_task_conv_handler)
-    application.add_handler(admin_fix_id_conv_handler)
-    application.add_handler(admin_review_conv_handler)
-    application.add_handler(user_task_conv_handler)
-    application.add_handler(admin_product_conv_handler)
-    application.add_handler(user_buy_conv_handler)
-    application.add_handler(admin_reset_conv_handler)
-    application.add_handler(CallbackQueryHandler(handle_submission_callback))
-    application.add_handler(CommandHandler('admin', admin_panel))
-    application.add_handler(MessageHandler(
-        filters.Regex(
-            r'^(👤 Профиль|🛍️ Магазин|📊 Рейтинг участников|📤 Отправить задание|👨‍💼 Панель администратора|👥 Список пользователей|⭐ Добавить баллы|📝 Создать задание|📋 Список заданий|📨 Проверка заданий|🛍️ Добавить товар|📦 Список товаров|🆔 Исправить ID|🗑️ Сбросить пользователей|📊 Статистика|🔙 Главное меню|🔙 Назад|🔙 Отмена|🛒 Купить товар #\d+|✅ Да, купить товар|❌ Нет, отменить|🔙 Назад к товарам)$'),
+    dispatcher.add_handler(user_conv_handler)
+    dispatcher.add_handler(admin_points_conv_handler)
+    dispatcher.add_handler(admin_task_conv_handler)
+    dispatcher.add_handler(admin_fix_id_conv_handler)
+    dispatcher.add_handler(admin_review_conv_handler)
+    dispatcher.add_handler(user_task_conv_handler)
+    dispatcher.add_handler(admin_product_conv_handler)
+    dispatcher.add_handler(user_buy_conv_handler)
+    dispatcher.add_handler(admin_reset_conv_handler)
+    dispatcher.add_handler(CallbackQueryHandler(handle_submission_callback))
+    dispatcher.add_handler(CommandHandler('admin', admin_panel))
+    dispatcher.add_handler(MessageHandler(
+        Filters.regex(r'^(👤 Профиль|🛍️ Магазин|📊 Рейтинг участников|📤 Отправить задание|👨‍💼 Панель администратора|👥 Список пользователей|⭐ Добавить баллы|📝 Создать задание|📋 Список заданий|📨 Проверка заданий|🛍️ Добавить товар|📦 Список товаров|🆔 Исправить ID|🗑️ Сбросить пользователей|📊 Статистика|🔙 Главное меню|🔙 Назад|🔙 Отмена|🛒 Купить товар #\d+|✅ Да, купить товар|❌ Нет, отменить|🔙 Назад к товарам)$'),
         handle_buttons
     ))
 
-    logger.info("Бот запущен на сервере Railway!")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    logger.info("Бот запущен локально!")
+    updater.start_polling()
+    updater.idle()
 
+def main_web():
+    """Запуск бота на сервере"""
+    TOKEN = os.environ.get('BOT_TOKEN', '8549336941:AAHUqok5bUKTypT-X8UGtXdkih8CDTNnHJ4')
+    
+    updater = Updater(TOKEN, use_context=True)
+    dispatcher = updater.dispatcher
+
+    # ТЕ ЖЕ ОБРАБОТЧИКИ ЧТО И В main()
+    
+    logger.info("Бот запущен на сервере Railway!")
+    updater.start_polling()
+    updater.idle()
 
 if __name__ == '__main__':
-    # Проверяем, запущен ли код на Railway
-    if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_STATIC_URL'):
+    if os.environ.get('RAILWAY_ENVIRONMENT'):
         print("🚀 Запуск на Railway сервере...")
         main_web()
     else:
         print("💻 Локальный запуск...")
         main()
-if __name__ == '__main__':
-    main()
