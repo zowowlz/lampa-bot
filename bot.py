@@ -437,7 +437,23 @@ async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     return USER_BUY_PRODUCT
+async def admin_create_product_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Начало создания товара"""
+    user_id = update.effective_user.id
+    logger.info(f"Начало создания товара пользователем {user_id}")
 
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ У вас нет доступа.")
+        return ConversationHandler.END
+
+    await update.message.reply_text(
+        "🛍️ <b>Добавление нового товара</b>\n\n"
+        "Введите название товара:",
+        parse_mode='HTML',
+        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
+    )
+
+    return ADMIN_CREATE_PRODUCT_NAME
 
 async def submit_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начало отправки задания"""
@@ -2297,5 +2313,6 @@ def main_web():
 
     logger.info("Бот запущен на сервере Railway!")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
+
 
 
