@@ -2336,13 +2336,6 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     users = load_users()
     text = update.message.text
 
-    # Обработка специальной кнопки "Главное меню" — всегда ведёт в основное меню
-if text == "🔙 Главное меню":
-    await update.message.reply_text(
-        "🔙 Возврат в главное меню.",
-        reply_markup=get_main_keyboard(user_id)
-    )
-    return
 
 # Обработка универсальных кнопок "Назад"/"Отмена"
 if text in ["🔙 Назад", "🔙 Отмена"]:
