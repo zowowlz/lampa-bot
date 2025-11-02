@@ -36,6 +36,9 @@ ADMIN_SET_PRODUCT_PRICE = 2
 USER_BUY_PRODUCT = 1
 USER_CONFIRM_PURCHASE = 2
 ADMIN_CONFIRM_RESET = 1
+ADMIN_CREATE_PRODUCT = 1
+ADMIN_SET_PRODUCT_DESCRIPTION = 2  # Добавляем это состояние
+ADMIN_SET_PRODUCT_PRICE = 3
 
 # Файлы для хранения данных
 DATA_FILE = 'users_data.json'
@@ -715,7 +718,6 @@ async def admin_create_product_start(update: Update, context: ContextTypes.DEFAU
 
     return ADMIN_CREATE_PRODUCT
 
-
 async def admin_create_product_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Завершение создания товара - установка описания"""
     text = update.message.text
@@ -737,8 +739,31 @@ async def admin_create_product_finish(update: Update, context: ContextTypes.DEFA
         reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
     )
 
-    return ADMIN_SET_PRODUCT_PRICE
+    return ADMIN_SET_PRODUCT_DESCRIPTION
 
+async def admin_set_product_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Установка описания товара"""
+    text = update.message.text
+
+    if text == "🔙 Отмена":
+        await update.message.reply_text(
+            "❌ Добавление товара отменено.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
+
+    # Сохраняем описание товара
+    context.user_data['product_description'] = text
+
+    await update.message.reply_text(
+        f"📦 <b>Название товара:</b> {context.user_data['product_name']}\n"
+        f"📝 <b>Описание:</b> {text}\n\n"
+        "Теперь введите цену товара в баллах:",
+        parse_mode='HTML',
+        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
+    )
+
+    return ADMIN_SET_PRODUCT_PRICE
 
 async def admin_save_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Сохранение товара"""
@@ -791,8 +816,11 @@ async def admin_save_product(update: Update, context: ContextTypes.DEFAULT_TYPE)
         reply_markup=get_admin_keyboard()
     )
 
-    return ConversationHandler.END
+    # Очищаем контекст
+    context.user_data.pop('product_name', None)
+    context.user_data.pop('product_description', None)
 
+    return ConversationHandler.END
 
 async def admin_products_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Список всех товаров"""
@@ -2061,14 +2089,16 @@ def main():
     )
 
     # ConversationHandler для администратора (добавление товаров)
-    admin_product_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
-        states={
-            ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_finish)],
-            ADMIN_SET_PRODUCT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
+# ConversationHandler для администратора (добавление товаров)
+admin_product_conv_handler = ConversationHandler(
+    entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
+    states={
+        ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_finish)],
+        ADMIN_SET_PRODUCT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_product_description)],
+        ADMIN_SET_PRODUCT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)]
+    },
+    fallbacks=[CommandHandler('cancel', admin_cancel)]
+)
 
     # ConversationHandler для пользователей (покупка товаров)
     user_buy_conv_handler = ConversationHandler(
@@ -2301,4 +2331,5 @@ if __name__ == '__main__':
         print("💻 Локальный запуск...")
         main()
 if __name__ == '__main__':
+
     main()
