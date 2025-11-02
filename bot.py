@@ -2218,7 +2218,18 @@ def main_web():
     # Создаем application
     application = Application.builder().token(TOKEN).build()
 
-    # Добавляем все обработчики (как в оригинальной функции main())
+    # ConversationHandler для администратора (добавление товаров)
+    admin_product_conv_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
+        states={
+            ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_finish)],
+            ADMIN_SET_PRODUCT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_product_description)],
+            ADMIN_SET_PRODUCT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)]
+        },
+        fallbacks=[CommandHandler('cancel', admin_cancel)],
+        name="admin_product_conversation"
+    )
+
     # ConversationHandler для регистрации пользователей
     user_conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
@@ -2228,18 +2239,6 @@ def main_web():
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
-
-# ConversationHandler для администратора (добавление товаров)
-admin_product_conv_handler = ConversationHandler(
-    entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
-    states={
-        ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_finish)],
-        ADMIN_SET_PRODUCT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_product_description)],
-        ADMIN_SET_PRODUCT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)]
-    },
-    fallbacks=[CommandHandler('cancel', admin_cancel)],
-    name="admin_product_conversation"
-)
 
     # ConversationHandler для пользователей (покупка товаров)
     user_buy_conv_handler = ConversationHandler(
@@ -2316,12 +2315,10 @@ admin_product_conv_handler = ConversationHandler(
     )
 
     # Добавление обработчиков
-# Добавление обработчиков
-application.add_handler(admin_product_conv_handler)  # ПЕРВЫМ!
-application.add_handler(user_conv_handler)
-application.add_handler(user_buy_conv_handler)
-application.add_handler(admin_points_conv_handler)
-# ... остальные обработчики
+    application.add_handler(admin_product_conv_handler)
+    application.add_handler(user_conv_handler)
+    application.add_handler(user_buy_conv_handler)
+    application.add_handler(admin_points_conv_handler)
     application.add_handler(admin_task_conv_handler)
     application.add_handler(admin_fix_id_conv_handler)
     application.add_handler(admin_review_conv_handler)
@@ -2339,13 +2336,4 @@ application.add_handler(admin_points_conv_handler)
     
     # Запускаем бота (синхронно)
     application.run_polling()
-
-if __name__ == '__main__':
-    # Проверяем, запущен ли код на Railway
-    if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_STATIC_URL'):
-        print("🚀 Запуск на Railway сервере...")
-        main_web()
-    else:
-        print("💻 Локальный запуск...")
-        main()
 
