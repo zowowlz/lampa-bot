@@ -31,8 +31,9 @@ USER_SUBMIT_TASK = 1
 ADMIN_FIX_ID_SELECT_USER = 1
 ADMIN_FIX_ID_SET_NEW = 2
 ADMIN_REVIEW_SELECT = 1
-ADMIN_CREATE_PRODUCT = 1
-ADMIN_SET_PRODUCT_PRICE = 2
+ADMIN_CREATE_PRODUCT_NAME = 3  # Новое состояние
+ADMIN_CREATE_PRODUCT_DESCRIPTION = 4  # Новое состояние
+ADMIN_SET_PRODUCT_PRICE = 5  # Новое состояние
 USER_BUY_PRODUCT = 1
 USER_CONFIRM_PURCHASE = 2
 ADMIN_CONFIRM_RESET = 1
@@ -713,7 +714,7 @@ async def admin_create_product_start(update: Update, context: ContextTypes.DEFAU
         reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
     )
 
-    return ADMIN_CREATE_PRODUCT
+    return ADMIN_CREATE_PRODUCT_NAME
 
 
 async def admin_create_product_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -737,7 +738,7 @@ async def admin_create_product_name(update: Update, context: ContextTypes.DEFAUL
         reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
     )
 
-    return ADMIN_SET_PRODUCT_PRICE
+    return ADMIN_CREATE_PRODUCT_DESCRIPTION
 
 
 async def admin_create_product_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -828,7 +829,7 @@ async def admin_save_product(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
 
     return ConversationHandler.END
-
+    
 async def admin_review_submission(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Просмотр выбранного задания для оценки"""
     text = update.message.text
@@ -2296,4 +2297,5 @@ def main_web():
 
     logger.info("Бот запущен на сервере Railway!")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
+
 
