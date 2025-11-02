@@ -2058,18 +2058,19 @@ def main():
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
-   # ConversationHandler для администратора (добавление товаров)
-admin_product_conv_handler = ConversationHandler(
-    entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
-    states={
-        ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_name)],
-        ADMIN_SET_PRODUCT_PRICE: [
-            MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_description),
-            MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)
-        ]
-    },
-    fallbacks=[CommandHandler('cancel', admin_cancel)]
-)
+
+    # ConversationHandler для администратора (добавление товаров)
+    admin_product_conv_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
+        states={
+            ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_name)],
+            ADMIN_SET_PRODUCT_PRICE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_description),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)
+            ]
+        },
+        fallbacks=[CommandHandler('cancel', admin_cancel)]
+    )
 
     # ConversationHandler для пользователей (покупка товаров)
     user_buy_conv_handler = ConversationHandler(
@@ -2110,6 +2111,7 @@ admin_product_conv_handler = ConversationHandler(
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
+
     # ConversationHandler для администратора (сброс пользователей)
     admin_reset_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex('^🗑️ Сбросить пользователей$'), admin_reset_users_start)],
@@ -2118,6 +2120,7 @@ admin_product_conv_handler = ConversationHandler(
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
+
     # ConversationHandler для администратора (проверка заданий)
     admin_review_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex('^📨 Проверка заданий$'), admin_pending_submissions)],
@@ -2164,7 +2167,6 @@ admin_product_conv_handler = ConversationHandler(
     logger.info("Бот запущен!")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
-
 import os
 import asyncio
 
@@ -2191,8 +2193,11 @@ def main_web():
     admin_product_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
         states={
-            ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_finish)],
-            ADMIN_SET_PRODUCT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)]
+            ADMIN_CREATE_PRODUCT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_name)],
+            ADMIN_SET_PRODUCT_PRICE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_description),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_save_product)
+            ]
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
@@ -2292,15 +2297,3 @@ def main_web():
     logger.info("Бот запущен на сервере Railway!")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
-
-if __name__ == '__main__':
-    # Проверяем, запущен ли код на Railway
-    if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_STATIC_URL'):
-        print("🚀 Запуск на Railway сервере...")
-        main_web()
-    else:
-        print("💻 Локальный запуск...")
-        main()
-if __name__ == '__main__':
-
-    main()
