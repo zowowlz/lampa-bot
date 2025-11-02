@@ -2556,8 +2556,8 @@ import asyncio
 def main_web():
     """Функция для запуска на веб-сервере"""
     # Получаем токен из переменных окружения Railway
-    TOKEN = os.environ.get('BOT_TOKEN', '8549336941:AAHUqok5bUKTypT-X8UGtXdkih8CDTNnHJ4')
-   application = Application.builder().token(TOKEN).build()
+    TOKEN = os.environ.get('BOT_TOKEN', '8549336941:AAHUqok5bUKTyPI-X8UGtxdkih8CDTMnHJ4')
+    application = Application.builder().token(TOKEN).build()
 
     # ConversationHandler для регистрации пользователей
     user_conv_handler = ConversationHandler(
@@ -2568,6 +2568,15 @@ def main_web():
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
+    
+    # Add handler to application
+    application.add_handler(user_conv_handler)
+    
+    # Start the bot
+    application.run_polling()
+
+# Make sure these handler functions are defined:
+# start(), register_first_name(), register_surname(), cancel()
 
     # ConversationHandler для администратора (добавление товаров)
     admin_product_conv_handler = ConversationHandler(
@@ -2705,4 +2714,5 @@ if __name__ == '__main__':
 if __name__ == '__main__':
 
     main()
+
 
