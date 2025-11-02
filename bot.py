@@ -23,22 +23,20 @@ logger = logging.getLogger(__name__)
 # Состояния для ConversationHandler
 WAITING_FOR_FIRST_NAME = 1
 WAITING_FOR_SURNAME = 2
-ADMIN_SELECT_USER = 1
-ADMIN_ADD_POINTS = 2
-ADMIN_CREATE_TASK = 1
-ADMIN_SET_TASK_POINTS = 2
-USER_SUBMIT_TASK = 1
-ADMIN_FIX_ID_SELECT_USER = 1
-ADMIN_FIX_ID_SET_NEW = 2
-ADMIN_REVIEW_SELECT = 1
-ADMIN_CREATE_PRODUCT = 1
-ADMIN_SET_PRODUCT_PRICE = 2
-USER_BUY_PRODUCT = 1
-USER_CONFIRM_PURCHASE = 2
-ADMIN_CONFIRM_RESET = 1
-ADMIN_CREATE_PRODUCT = 1
-ADMIN_SET_PRODUCT_DESCRIPTION = 2  # Добавляем это состояние
-ADMIN_SET_PRODUCT_PRICE = 3
+ADMIN_SELECT_USER = 3
+ADMIN_ADD_POINTS = 4
+ADMIN_CREATE_TASK = 5
+ADMIN_SET_TASK_POINTS = 6
+USER_SUBMIT_TASK = 7
+ADMIN_FIX_ID_SELECT_USER = 8
+ADMIN_FIX_ID_SET_NEW = 9
+ADMIN_REVIEW_SELECT = 10
+ADMIN_CREATE_PRODUCT = 11
+ADMIN_SET_PRODUCT_DESCRIPTION = 12
+ADMIN_SET_PRODUCT_PRICE = 13
+USER_BUY_PRODUCT = 14
+USER_CONFIRM_PURCHASE = 15
+ADMIN_CONFIRM_RESET = 16
 
 # Файлы для хранения данных
 DATA_FILE = 'users_data.json'
@@ -704,6 +702,7 @@ async def confirm_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def admin_create_product_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начало создания товара"""
     user_id = update.effective_user.id
+    logger.info(f"Админ {user_id} начал добавление товара")
 
     if not is_admin(user_id):
         await update.message.reply_text("❌ У вас нет доступа.")
@@ -719,8 +718,9 @@ async def admin_create_product_start(update: Update, context: ContextTypes.DEFAU
     return ADMIN_CREATE_PRODUCT
 
 async def admin_create_product_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Завершение создания товара - установка описания"""
+    """Обработка названия товара"""
     text = update.message.text
+    logger.info(f"Получено название товара: {text}")
 
     if text == "🔙 Отмена":
         await update.message.reply_text(
@@ -731,9 +731,10 @@ async def admin_create_product_finish(update: Update, context: ContextTypes.DEFA
 
     # Сохраняем название товара
     context.user_data['product_name'] = text
+    logger.info(f"Сохранено название товара: {text}")
 
     await update.message.reply_text(
-        f"📦 <b>Название товара:</b>\n{text}\n\n"
+        f"📦 <b>Название товара:</b> {text}\n\n"
         "Теперь введите описание товара:",
         parse_mode='HTML',
         reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
@@ -742,8 +743,9 @@ async def admin_create_product_finish(update: Update, context: ContextTypes.DEFA
     return ADMIN_SET_PRODUCT_DESCRIPTION
 
 async def admin_set_product_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Установка описания товара"""
+    """Обработка описания товара"""
     text = update.message.text
+    logger.info(f"Получено описание товара: {text}")
 
     if text == "🔙 Отмена":
         await update.message.reply_text(
@@ -754,6 +756,7 @@ async def admin_set_product_description(update: Update, context: ContextTypes.DE
 
     # Сохраняем описание товара
     context.user_data['product_description'] = text
+    logger.info(f"Сохранено описание товара: {text}")
 
     await update.message.reply_text(
         f"📦 <b>Название товара:</b> {context.user_data['product_name']}\n"
@@ -766,8 +769,9 @@ async def admin_set_product_description(update: Update, context: ContextTypes.DE
     return ADMIN_SET_PRODUCT_PRICE
 
 async def admin_save_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Сохранение товара"""
+    """Сохранение товара с ценой"""
     text = update.message.text
+    logger.info(f"Получена цена товара: {text}")
 
     if text == "🔙 Отмена":
         await update.message.reply_text(
@@ -792,6 +796,14 @@ async def admin_save_product(update: Update, context: ContextTypes.DEFAULT_TYPE)
     product_name = context.user_data.get('product_name')
     product_description = context.user_data.get('product_description')
 
+    if not product_name or not product_description:
+        logger.error("Не найдены данные товара в контексте")
+        await update.message.reply_text(
+            "❌ Ошибка: данные товара не найдены. Начните заново.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
+
     # Сохраняем товар
     products = load_products()
     product_id = str(generate_product_id(products))
@@ -804,6 +816,8 @@ async def admin_save_product(update: Update, context: ContextTypes.DEFAULT_TYPE)
         'created_by': update.effective_user.id
     }
     save_products(products)
+
+    logger.info(f"Товар успешно добавлен: {product_name} (ID: {product_id})")
 
     await update.message.reply_text(
         f"✅ <b>Товар успешно добавлен!</b>\n\n"
@@ -2302,9 +2316,9 @@ def main_web():
 
     # Добавление обработчиков
     application.add_handler(user_conv_handler)
+    application.add_handler(admin_product_conv_handler)  # ДОБАВЬТЕ ЭТУ СТРОКУ В НАЧАЛО
     application.add_handler(admin_points_conv_handler)
     application.add_handler(admin_task_conv_handler)
-    application.add_handler(admin_fix_id_conv_handler)
     application.add_handler(admin_review_conv_handler)
     application.add_handler(user_task_conv_handler)
     application.add_handler(admin_product_conv_handler)
@@ -2333,5 +2347,6 @@ if __name__ == '__main__':
 if __name__ == '__main__':
 
     main()
+
 
 
