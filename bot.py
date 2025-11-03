@@ -1684,7 +1684,7 @@ async def admin_set_task_points(update: Update, context: ContextTypes.DEFAULT_TY
 
     # Сохраняем задание
     tasks = load_tasks()
-    task_id = str(generate_unique_id(tasks))  # Преобразуем в строку для consistency
+    task_id = str(generate_task_id(tasks))
 
     tasks[task_id] = {
         'description': task_description,
@@ -2551,4 +2551,5 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
