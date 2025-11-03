@@ -83,7 +83,6 @@ def generate_product_id(products):
             continue
 
     return max_id + 1
-task_id = str(generate_task_id(tasks))
 
 def generate_task_id(tasks):
     """Генерация уникального ID для задания"""
@@ -1480,15 +1479,12 @@ async def handle_submission_callback(update: Update, context: ContextTypes.DEFAU
             except Exception as e:
                 logger.error(f"Не удалось уведомить пользователя {user_id}: {e}")
 
-            # Удаляем сообщение с кнопками и показываем результат
-            await query.delete_message()
-            await context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text=f"✅ <b>Задание принято!</b>\n\n"
-                     f"👤 Пользователь: {submission['user_name']}\n"
-                     f"🎯 Задание: {submission['task_description']}\n"
-                     f"⭐ Начислено баллов: {submission['task_points']}\n"
-                     f"💰 Новый баланс: {users[user_id]['points']}",
+            await query.edit_message_text(
+                f"✅ <b>Задание принято!</b>\n\n"
+                f"👤 Пользователь: {submission['user_name']}\n"
+                f"🎯 Задание: {submission['task_description']}\n"
+                f"⭐ Начислено баллов: {submission['task_points']}\n"
+                f"💰 Новый баланс: {users[user_id]['points']}",
                 parse_mode='HTML'
             )
 
@@ -1508,18 +1504,15 @@ async def handle_submission_callback(update: Update, context: ContextTypes.DEFAU
         except Exception as e:
             logger.error(f"Не удалось уведомить пользователя {user_id}: {e}")
 
-        # Удаляем сообщение с кнопками и показываем результат
-        await query.delete_message()
-        await context.bot.send_message(
-            chat_id=query.message.chat_id,
-            text=f"❌ <b>Задание отклонено</b>\n\n"
-                 f"👤 Пользователь: {submission['user_name']}\n"
-                 f"🎯 Задание: {submission['task_description']}",
+        await query.edit_message_text(
+            f"❌ <b>Задание отклонено</b>\n\n"
+            f"👤 Пользователь: {submission['user_name']}\n"
+            f"🎯 Задание: {submission['task_description']}",
             parse_mode='HTML'
         )
 
     # После принятия/отклонения автоматически возвращаем к списку заданий
-    await show_pending_submissions_after_review(context, query.message.chat_id)
+    await show_pending_submissions_after_review(context, update.effective_chat.id)  # ИСПРАВЛЕНО: убрали лишний параметр
 
 
 async def admin_create_product_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1684,7 +1677,7 @@ async def admin_set_task_points(update: Update, context: ContextTypes.DEFAULT_TY
 
     # Сохраняем задание
     tasks = load_tasks()
-    task_id = str(generate_task_id(tasks))
+    task_id = str(generate_task_id(tasks))  # ИСПРАВЛЕНО: используем generate_task_id
 
     tasks[task_id] = {
         'description': task_description,
@@ -1705,7 +1698,6 @@ async def admin_set_task_points(update: Update, context: ContextTypes.DEFAULT_TY
     )
 
     return ConversationHandler.END
-
 
 async def admin_tasks_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Список всех заданий"""
@@ -1848,7 +1840,6 @@ async def show_pending_submissions_after_review(context: ContextTypes.DEFAULT_TY
         parse_mode='HTML',
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
-
 
 # ФУНКЦИИ ДЛЯ РЕДАКТИРОВАНИЯ ID
 
@@ -2551,6 +2542,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
