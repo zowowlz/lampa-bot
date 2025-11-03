@@ -85,6 +85,20 @@ def generate_product_id(products):
     return max_id + 1
 task_id = str(generate_task_id(tasks))
 
+def generate_task_id(tasks):
+    """Генерация уникального ID для задания"""
+    if not tasks:
+        return 1
+    max_id = 0
+    for task_id in tasks.keys():
+        try:
+            num_id = int(task_id)
+            if num_id > max_id:
+                max_id = num_id
+        except ValueError:
+            continue
+    return max_id + 1
+    
 def load_data(filename):
     """Загрузка данных из файла"""
     try:
@@ -179,20 +193,6 @@ def generate_unique_id(items):
     # Находим максимальный ID и возвращаем следующий
     return max(existing_ids) + 1
 
-def generate_task_id(tasks):
-    """Генерация уникального ID для задания"""
-    if not tasks:
-        return 1
-    max_id = 0
-    for task_id in tasks.keys():
-        try:
-            num_id = int(task_id)
-            if num_id > max_id:
-                max_id = num_id
-        except ValueError:
-            continue
-    return max_id + 1
-    
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start"""
     user_id = update.effective_user.id
@@ -2551,5 +2551,6 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
