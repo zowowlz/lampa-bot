@@ -1506,7 +1506,6 @@ async def show_pending_submissions_after_review(context: ContextTypes.DEFAULT_TY
     """Показать список заданий после принятия/отклонения"""
     submissions = load_submissions()
     pending_subs = {k: v for k, v in submissions.items() if v['status'] == 'pending'}
-
     if not pending_subs:
         await context.bot.send_message(
             chat_id=chat_id,
@@ -1514,26 +1513,20 @@ async def show_pending_submissions_after_review(context: ContextTypes.DEFAULT_TY
             reply_markup=get_admin_keyboard()
         )
         return
-
     # Создаем клавиатуру с заданиями на проверке
     keyboard = []
     for sub_id, submission in pending_subs.items():
         keyboard.append([KeyboardButton(
             f"#{sub_id} - {submission['user_name']} - {submission['task_description'][:30]}..."
         )])
-
     keyboard.append([KeyboardButton("🔙 Назад")])
-
     await context.bot.send_message(
         chat_id=chat_id,
-        text="📨 <b>Задания на проверке:</b>\n\nВыберите задание для оценки:",
+        text="📨 <b>Задания на проверке:</b>\nВыберите задание для оценки:",
         parse_mode='HTML',
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
-
-    # После принятия/отклонения автоматически возвращаем к списку заданий
-    await admin_pending_submissions(update, context)
-
+    # НЕ вызываем admin_pending_submissions здесь — это делает сам обработчик кнопки "📨 Проверка заданий"
 
 async def admin_pending_submissions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Список заданий на проверке с возможностью выбора"""
@@ -2533,6 +2526,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
