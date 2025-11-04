@@ -505,10 +505,8 @@ async def submit_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return USER_SUBMIT_TASK
 
 
-async def submit_task_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Завершение отправки задания"""
+async def submit_task_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
-
     if text == "🔙 Отмена":
         await update.message.reply_text(
             "❌ Отправка задания отменена.",
@@ -516,7 +514,6 @@ async def submit_task_finish(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return ConversationHandler.END
 
-    # Извлекаем ID задания из текста
     try:
         task_id = text.split('#')[1].split(' - ')[0]
     except (IndexError, ValueError):
@@ -524,7 +521,7 @@ async def submit_task_finish(update: Update, context: ContextTypes.DEFAULT_TYPE)
             "❌ Ошибка выбора задания. Попробуйте еще раз:",
             reply_markup=get_main_keyboard()
         )
-        return USER_SUBMIT_TASK
+        return USER_SELECT_TASK
 
     tasks = load_tasks()
     if task_id not in tasks:
@@ -534,23 +531,20 @@ async def submit_task_finish(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return ConversationHandler.END
 
-    # Сохраняем выбранное задание
     context.user_data['selected_task'] = task_id
     task = tasks[task_id]
 
     await update.message.reply_text(
-        f"📤 <b>Отправка задания:</b>\n\n"
+        f"📤 <b>Отправка задания:</b>\n"
         f"🎯 Задание #{task_id}\n"
         f"📝 {task['description']}\n"
-        f"⭐ Награда: {task['points']} баллов\n\n"
-        f"📎 Прикрепите файл, фото, видео или напишите текстовый ответ для отправки задания:",
+        f"⭐ Награда: {task['points']} баллов\n"
+        f"📎 Прикрепите файл, фото, видео или напишите текстовый ответ:",
         parse_mode='HTML',
         reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
     )
-
-    return USER_SUBMIT_TASK
-
-
+    return USER_SEND_TASK_CONTENT
+    
 async def buy_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка выбора товара для покупки"""
     text = update.message.text
@@ -2545,6 +2539,7 @@ user_task_conv_handler = ConversationHandler(
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
