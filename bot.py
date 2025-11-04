@@ -2415,7 +2415,6 @@ def main():
     TOKEN = '8549336941:AAHUqok5bUKTypT-X8UGtXdkih8CDTNnHJ4'
     application = Application.builder().token(TOKEN).build()
 
-    # ConversationHandler для регистрации пользователей
     user_conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
@@ -2425,7 +2424,6 @@ def main():
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
-    # ConversationHandler для администратора (добавление товаров)
     admin_product_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
         states={
@@ -2437,7 +2435,6 @@ def main():
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
 
-    # ConversationHandler для пользователей (покупка товаров)
     user_buy_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex('^🛍️ Магазин$'), shop)],
         states={
@@ -2447,7 +2444,6 @@ def main():
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
-    # ConversationHandler для администратора (добавление баллов)
     admin_points_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex('^⭐ Добавить баллы$'), admin_add_points_start)],
         states={
@@ -2457,7 +2453,6 @@ def main():
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
 
-    # ConversationHandler для администратора (создание заданий)
     admin_task_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex('^📝 Создать задание$'), admin_create_task_start)],
         states={
@@ -2467,7 +2462,6 @@ def main():
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
 
-    # ConversationHandler для администратора (исправление ID)
     admin_fix_id_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex('^🆔 Исправить ID$'), admin_fix_id_start)],
         states={
@@ -2477,7 +2471,6 @@ def main():
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
 
-    # ConversationHandler для администратора (сброс пользователей)
     admin_reset_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex('^🗑️ Сбросить пользователей$'), admin_reset_users_start)],
         states={
@@ -2486,35 +2479,32 @@ def main():
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
 
-    # ConversationHandler для администратора (проверка заданий)
     admin_review_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex('^📨 Проверка заданий$'), admin_pending_submissions)],
         states={
             ADMIN_REVIEW_SELECT: [
-                MessageHandler(filters.Regex('^🔙 Назад$'), lambda update, context: admin_cancel(update, context)),
+                MessageHandler(filters.Regex('^🔙 Назад$'), lambda u, c: admin_cancel(u, c)),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, admin_review_submission)
             ]
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
 
-    # ConversationHandler для пользователей (отправка заданий)
-user_task_conv_handler = ConversationHandler(
-    entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
-    states={
-        USER_SELECT_TASK: [
-            MessageHandler(filters.Regex('^🔙 Отмена$'), cancel),
-            MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_select)
-        ],
-        USER_SEND_TASK_CONTENT: [
-            MessageHandler(filters.Regex('^🔙 Отмена$'), cancel),
-            MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT, handle_task_submission)
-        ]
-    },
-    fallbacks=[CommandHandler('cancel', cancel)]
-)
+    user_task_conv_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
+        states={
+            USER_SELECT_TASK: [
+                MessageHandler(filters.Regex('^🔙 Отмена$'), cancel),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_select)
+            ],
+            USER_SEND_TASK_CONTENT: [
+                MessageHandler(filters.Regex('^🔙 Отмена$'), cancel),
+                MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT, handle_task_submission)
+            ]
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
 
-    # Добавление обработчиков
     application.add_handler(user_conv_handler)
     application.add_handler(admin_points_conv_handler)
     application.add_handler(admin_task_conv_handler)
@@ -2543,6 +2533,7 @@ user_task_conv_handler = ConversationHandler(
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
