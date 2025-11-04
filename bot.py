@@ -2398,8 +2398,9 @@ async def admin_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=get_admin_keyboard()
     )
     return ConversationHandler.END
-
-
+    
+    
+    
 def main():
     """Запуск бота"""
     TOKEN = '8549336941:AAHUqok5bUKTypT-X8UGtXdkih8CDTNnHJ4'
@@ -2488,17 +2489,17 @@ def main():
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
 
-user_task_conv_handler = ConversationHandler(
-    entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
-    states={
-        USER_SUBMIT_TASK: [
-            MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_select),
-            MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT,
-                           handle_task_submission)
-        ]
-    },
-    fallbacks=[CommandHandler('cancel', cancel)]
-)
+    # ConversationHandler для пользователей (отправка заданий)
+    user_task_conv_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
+        states={
+            USER_SUBMIT_TASK: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_finish),
+                MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT, handle_task_submission)
+            ]
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
 
     # Добавление обработчиков
     application.add_handler(user_conv_handler)
@@ -2527,8 +2528,7 @@ user_task_conv_handler = ConversationHandler(
 
     logger.info("Бот запущен!")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
-if __name__ == '__main__':
-    main()
+
 
 
 
