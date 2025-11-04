@@ -2400,7 +2400,6 @@ async def admin_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     """Запуск бота"""
     TOKEN = '8549336941:AAHUqok5bUKTypT-X8UGtXdkih8CDTNnHJ4'
-
     application = Application.builder().token(TOKEN).build()
 
     # ConversationHandler для регистрации пользователей
@@ -2417,18 +2416,10 @@ def main():
     admin_product_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex('^🛍️ Добавить товар$'), admin_create_product_start)],
         states={
-            ADMIN_CREATE_PRODUCT_NAME: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_name)
-            ],
-            ADMIN_CREATE_PRODUCT_DESCRIPTION: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_description)
-            ],
-            ADMIN_CREATE_PRODUCT_PRICE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_price)
-            ],
-            ADMIN_SET_PRODUCT_QUANTITY: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_product_quantity)
-            ]
+            ADMIN_CREATE_PRODUCT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_name)],
+            ADMIN_CREATE_PRODUCT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_description)],
+            ADMIN_CREATE_PRODUCT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_product_price)],
+            ADMIN_SET_PRODUCT_QUANTITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_product_quantity)]
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
@@ -2494,20 +2485,18 @@ def main():
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
 
-user_task_conv_handler = ConversationHandler(
-    entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
-    states={
-        USER_SELECT_TASK: [
-            MessageHandler(filters.Regex('^🔙 Отмена$'), cancel),
-            MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_select)
-        ],
-        USER_SEND_TASK_CONTENT: [
-            MessageHandler(filters.Regex('^🔙 Отмена$'), cancel),
-            MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT, handle_task_submission)
-        ]
-    },
-    fallbacks=[CommandHandler('cancel', cancel)]
-)
+    # ConversationHandler для пользователей (отправка заданий)
+    user_task_conv_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
+        states={
+            USER_SUBMIT_TASK: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_finish),
+                MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT, handle_task_submission)
+            ]
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
+
     # Добавление обработчиков
     application.add_handler(user_conv_handler)
     application.add_handler(admin_points_conv_handler)
@@ -2519,14 +2508,12 @@ user_task_conv_handler = ConversationHandler(
     application.add_handler(user_buy_conv_handler)
     application.add_handler(admin_reset_conv_handler)
 
-    # В функции main() замените обработчики удаления товара на:
     application.add_handler(MessageHandler(filters.Regex('^🗑️ Удалить товар$'), admin_delete_product))
     application.add_handler(CallbackQueryHandler(handle_delete_product_callback, pattern='^delete_product_'))
     application.add_handler(CallbackQueryHandler(handle_confirm_delete_callback, pattern='^confirm_delete_'))
     application.add_handler(CallbackQueryHandler(handle_delete_cancel_final, pattern='^delete_cancel_final'))
     application.add_handler(CallbackQueryHandler(handle_delete_product_callback, pattern='^delete_cancel'))
 
-    # Общие обработчики
     application.add_handler(CallbackQueryHandler(handle_submission_callback))
     application.add_handler(CommandHandler('admin', admin_panel))
     application.add_handler(MessageHandler(
@@ -2539,6 +2526,7 @@ user_task_conv_handler = ConversationHandler(
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
