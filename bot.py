@@ -2499,20 +2499,20 @@ def main():
     )
 
     # ConversationHandler для пользователей (отправка заданий)
-    user_task_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
-        states={
-            USER_SELECT_TASK: [
-                MessageHandler(filters.Regex('^🔙 Отмена$'), cancel),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_select)
-            ],
-            USER_SEND_TASK_CONTENT: [
-                MessageHandler(filters.Regex('^🔙 Отмена$'), cancel),
-                MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT, handle_task_submission)
-            ]
-        },
-        fallbacks=[CommandHandler('cancel', cancel)]
-    )
+user_task_conv_handler = ConversationHandler(
+    entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
+    states={
+        USER_SELECT_TASK: [
+            MessageHandler(filters.Regex('^🔙 Отмена$'), cancel),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_select)
+        ],
+        USER_SEND_TASK_CONTENT: [
+            MessageHandler(filters.Regex('^🔙 Отмена$'), cancel),
+            MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT, handle_task_submission)
+        ]
+    },
+    fallbacks=[CommandHandler('cancel', cancel)]
+)
 
     # Добавление обработчиков
     application.add_handler(user_conv_handler)
@@ -2543,6 +2543,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
