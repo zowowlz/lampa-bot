@@ -2359,50 +2359,6 @@ async def admin_create_task_finish(update: Update, context: ContextTypes.DEFAULT
     )
     return ADMIN_SET_TASK_POINTS
     
-async def submit_task_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка выбора задания перед отправкой ответа"""
-    text = update.message.text
-    if text == "🔙 Отмена":
-        await update.message.reply_text(
-            "❌ Отправка задания отменена.",
-            reply_markup=get_main_keyboard()
-        )
-        return ConversationHandler.END
-
-    # Извлекаем ID задания из текста кнопки: "#123 - Описание..."
-    import re
-
-# Ищем число после символа #
-match = re.search(r'#(\d+)', text)
-if not match:
-    await update.message.reply_text("❌ Ошибка выбора задания. Попробуйте еще раз:", reply_markup=get_main_keyboard())
-    return USER_SELECT_TASK
-task_id = match.group(1)
-
-    tasks = load_tasks()
-    if task_id not in tasks:
-        await update.message.reply_text(
-            "❌ Задание не найдено.",
-            reply_markup=get_main_keyboard()
-        )
-        return ConversationHandler.END
-
-    # Сохраняем выбранное задание
-    context.user_data['selected_task'] = task_id
-    task = tasks[task_id]
-
-    await update.message.reply_text(
-        f"📤 <b>Отправка задания:</b>\n"
-        f"🎯 Задание #{task_id}\n"
-        f"📝 {task['description']}\n"
-        f"⭐ Награда: {task['points']} баллов\n"
-        f"📎 Прикрепите файл, фото, видео или напишите текстовый ответ:",
-        parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
-    )
-    return USER_SUBMIT_TASK
-    
-    
 def main():
     """Запуск бота"""
     TOKEN = '8549336941:AAHUqok5bUKTypT-X8UGtXdkih8CDTNnHJ4'
@@ -2526,6 +2482,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
