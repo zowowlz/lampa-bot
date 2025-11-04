@@ -1586,7 +1586,7 @@ async def submit_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = []
     for task_id, task in tasks.items():
-        keyboard.append([KeyboardButton(f"#{task_id} - {task['description'][:30]}...")])
+        keyboard.append([KeyboardButton(f"Выбрать задание #{task_id}")])
     keyboard.append([KeyboardButton("🔙 Отмена")])
 
     await update.message.reply_text(
@@ -2377,14 +2377,14 @@ async def submit_task_finish(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return ConversationHandler.END
 
     # Извлекаем ID задания из текста кнопки: "#123 - Описание..."
-    try:
-        task_id = text.split('#')[1].split(' - ')[0]
-    except (IndexError, ValueError):
-        await update.message.reply_text(
-            "❌ Ошибка выбора задания. Попробуйте еще раз:",
-            reply_markup=get_main_keyboard()
-        )
-        return USER_SUBMIT_TASK
+    import re
+
+# Ищем число после символа #
+match = re.search(r'#(\d+)', text)
+if not match:
+    await update.message.reply_text("❌ Ошибка выбора задания. Попробуйте еще раз:", reply_markup=get_main_keyboard())
+    return USER_SELECT_TASK
+task_id = match.group(1)
 
     tasks = load_tasks()
     if task_id not in tasks:
@@ -2533,6 +2533,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
