@@ -2398,7 +2398,49 @@ async def admin_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=get_admin_keyboard()
     )
     return ConversationHandler.END
-    
+
+async def submit_task_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка выбора задания перед отправкой ответа"""
+    text = update.message.text
+    if text == "🔙 Отмена":
+        await update.message.reply_text(
+            "❌ Отправка задания отменена.",
+            reply_markup=get_main_keyboard()
+        )
+        return ConversationHandler.END
+
+    # Извлекаем ID задания из текста кнопки: "#123 - Описание..."
+    try:
+        task_id = text.split('#')[1].split(' - ')[0]
+    except (IndexError, ValueError):
+        await update.message.reply_text(
+            "❌ Ошибка выбора задания. Попробуйте еще раз:",
+            reply_markup=get_main_keyboard()
+        )
+        return USER_SUBMIT_TASK
+
+    tasks = load_tasks()
+    if task_id not in tasks:
+        await update.message.reply_text(
+            "❌ Задание не найдено.",
+            reply_markup=get_main_keyboard()
+        )
+        return ConversationHandler.END
+
+    # Сохраняем выбранное задание
+    context.user_data['selected_task'] = task_id
+    task = tasks[task_id]
+
+    await update.message.reply_text(
+        f"📤 <b>Отправка задания:</b>\n"
+        f"🎯 Задание #{task_id}\n"
+        f"📝 {task['description']}\n"
+        f"⭐ Награда: {task['points']} баллов\n"
+        f"📎 Прикрепите файл, фото, видео или напишите текстовый ответ:",
+        parse_mode='HTML',
+        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
+    )
+    return USER_SUBMIT_TASK
     
     
 def main():
@@ -2530,6 +2572,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
