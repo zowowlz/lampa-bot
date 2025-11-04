@@ -27,8 +27,8 @@ ADMIN_SELECT_USER = 1
 ADMIN_ADD_POINTS = 2
 ADMIN_CREATE_TASK = 1
 ADMIN_SET_TASK_POINTS = 2
-USER_SELECT_TASK = 1
-USER_SEND_TASK_CONTENT = 2
+USER_SELECT_TASK = 100
+USER_SEND_TASK_CONTENT = 101
 USER_SUBMIT_TASK = 1
 ADMIN_FIX_ID_SELECT_USER = 1
 ADMIN_FIX_ID_SET_NEW = 2
@@ -469,71 +469,46 @@ async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     return USER_BUY_PRODUCT
 async def submit_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Начало отправки задания"""
     user_id = str(update.effective_user.id)
     users = load_users()
-
     if user_id not in users:
-        await update.message.reply_text(
-            "❌ Вы не зарегистрированы. Используйте команду /start для регистрации."
-        )
+        await update.message.reply_text("❌ Вы не зарегистрированы. Используйте команду /start для регистрации.")
         return ConversationHandler.END
 
     tasks = load_tasks()
-
     if not tasks:
-        await update.message.reply_text(
-            "📭 На данный момент активных заданий нет.",
-            reply_markup=get_main_keyboard()
-        )
+        await update.message.reply_text("📭 На данный момент активных заданий нет.", reply_markup=get_main_keyboard())
         return ConversationHandler.END
 
-    # Создаем клавиатуру с заданиями
     keyboard = []
     for task_id, task in tasks.items():
         keyboard.append([KeyboardButton(f"#{task_id} - {task['description'][:30]}...")])
-
     keyboard.append([KeyboardButton("🔙 Отмена")])
 
     await update.message.reply_text(
-        "📋 <b>Выберите задание:</b>\n\n"
-        "Нажмите на задание, которое хотите отправить на проверку:",
+        "📋 <b>Выберите задание:</b>\nНажмите на задание, которое хотите отправить на проверку:",
         parse_mode='HTML',
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
-
-    return USER_SUBMIT_TASK
-
+    return USER_SELECT_TASK  # ← Меняем состояние!
 
 async def submit_task_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка выбора задания перед отправкой ответа"""
     text = update.message.text
     if text == "🔙 Отмена":
-        await update.message.reply_text(
-            "❌ Отправка задания отменена.",
-            reply_markup=get_main_keyboard()
-        )
+        await update.message.reply_text("❌ Отправка задания отменена.", reply_markup=get_main_keyboard())
         return ConversationHandler.END
 
-    # Извлекаем ID задания из текста кнопки: "#123 - Описание..."
     try:
         task_id = text.split('#')[1].split(' - ')[0]
     except (IndexError, ValueError):
-        await update.message.reply_text(
-            "❌ Ошибка выбора задания. Попробуйте еще раз:",
-            reply_markup=get_main_keyboard()
-        )
-        return USER_SUBMIT_TASK
+        await update.message.reply_text("❌ Ошибка выбора задания. Попробуйте еще раз:", reply_markup=get_main_keyboard())
+        return USER_SELECT_TASK
 
     tasks = load_tasks()
     if task_id not in tasks:
-        await update.message.reply_text(
-            "❌ Задание не найдено.",
-            reply_markup=get_main_keyboard()
-        )
+        await update.message.reply_text("❌ Задание не найдено.", reply_markup=get_main_keyboard())
         return ConversationHandler.END
 
-    # Сохраняем выбранное задание
     context.user_data['selected_task'] = task_id
     task = tasks[task_id]
 
@@ -546,7 +521,7 @@ async def submit_task_select(update: Update, context: ContextTypes.DEFAULT_TYPE)
         parse_mode='HTML',
         reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
     )
-    return USER_SUBMIT_TASK
+    return USER_SEND_TASK_CONTENT  # ← Переходим к отправке!
     
 async def buy_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка выбора товара для покупки"""
@@ -2531,18 +2506,20 @@ def main():
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
 
-    # ConversationHandler для пользователей (отправка заданий)
-    user_task_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
-        states={
-            USER_SUBMIT_TASK: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_finish),
-                MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT, handle_task_submission)
-            ]
-        },
-        fallbacks=[CommandHandler('cancel', cancel)]
-    )
-
+   user_task_conv_handler = ConversationHandler(
+    entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
+    states={
+        USER_SELECT_TASK: [
+            MessageHandler(filters.Regex('^🔙 Отмена$'), cancel),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_select)
+        ],
+        USER_SEND_TASK_CONTENT: [
+            MessageHandler(filters.Regex('^🔙 Отмена$'), cancel),
+            MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT, handle_task_submission)
+        ]
+    },
+    fallbacks=[CommandHandler('cancel', cancel)]
+)
     # Добавление обработчиков
     application.add_handler(user_conv_handler)
     application.add_handler(admin_points_conv_handler)
@@ -2572,6 +2549,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
