@@ -2499,27 +2499,25 @@ def main():
         entry_points=[MessageHandler(filters.Regex('^📨 Проверка заданий$'), admin_pending_submissions)],
         states={
             ADMIN_REVIEW_SELECT: [
-                MessageHandler(filters.Regex('^🔙 Назад$'), lambda update, context: admin_cancel(update, context)),
+                MessageHandler(filters.Regex('^🔙 Назад$'), lambda u, c: admin_cancel(u, c)),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, admin_review_submission)
             ]
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
 
-   user_task_conv_handler = ConversationHandler(
-    entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
-    states={
-        USER_SELECT_TASK: [
-            MessageHandler(filters.Regex('^🔙 Отмена$'), cancel),
-            MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_select)
-        ],
-        USER_SEND_TASK_CONTENT: [
-            MessageHandler(filters.Regex('^🔙 Отмена$'), cancel),
-            MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT, handle_task_submission)
-        ]
-    },
-    fallbacks=[CommandHandler('cancel', cancel)]
-)
+    # ConversationHandler для пользователей (отправка заданий)
+    user_task_conv_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
+        states={
+            USER_SUBMIT_TASK: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_finish),
+                MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT, handle_task_submission)
+            ]
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
+
     # Добавление обработчиков
     application.add_handler(user_conv_handler)
     application.add_handler(admin_points_conv_handler)
@@ -2549,6 +2547,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
