@@ -468,29 +468,19 @@ async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     return USER_BUY_PRODUCT
-async def submit_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    users = load_users()
-    if user_id not in users:
-        await update.message.reply_text("❌ Вы не зарегистрированы. Используйте команду /start для регистрации.")
+async def admin_create_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Начало создания задания"""
+    user_id = update.effective_user.id
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ У вас нет доступа.")
         return ConversationHandler.END
-
-    tasks = load_tasks()
-    if not tasks:
-        await update.message.reply_text("📭 На данный момент активных заданий нет.", reply_markup=get_main_keyboard())
-        return ConversationHandler.END
-
-    keyboard = []
-    for task_id, task in tasks.items():
-        keyboard.append([KeyboardButton(f"#{task_id} - {task['description'][:30]}...")])
-    keyboard.append([KeyboardButton("🔙 Отмена")])
-
     await update.message.reply_text(
-        "📋 <b>Выберите задание:</b>\nНажмите на задание, которое хотите отправить на проверку:",
+        "📝 <b>Создание нового задания</b>\n"
+        "Введите описание задания:",
         parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
     )
-    return USER_SELECT_TASK  # ← Меняем состояние!
+    return ADMIN_CREATE_TASK
 
 async def submit_task_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка выбора задания"""
@@ -2356,7 +2346,26 @@ async def admin_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=get_admin_keyboard()
     )
     return ConversationHandler.END
+async def admin_create_task_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Завершение создания задания — установка описания и запрос баллов"""
+    text = update.message.text
+    if text == "🔙 Отмена":
+        await update.message.reply_text(
+            "❌ Создание задания отменено.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
 
+    # Сохраняем описание задания
+    context.user_data['task_description'] = text
+    await update.message.reply_text(
+        f"📝 <b>Описание задания:</b>\n{text}\n"
+        "Теперь введите количество баллов за выполнение этого задания:",
+        parse_mode='HTML',
+        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
+    )
+    return ADMIN_SET_TASK_POINTS
+    
 async def submit_task_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка выбора задания перед отправкой ответа"""
     text = update.message.text
@@ -2534,6 +2543,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
