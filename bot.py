@@ -493,6 +493,7 @@ async def submit_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return USER_SELECT_TASK  # ← Меняем состояние!
 
 async def submit_task_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка выбора задания"""
     text = update.message.text
     if text == "🔙 Отмена":
         await update.message.reply_text("❌ Отправка задания отменена.", reply_markup=get_main_keyboard())
@@ -521,7 +522,7 @@ async def submit_task_select(update: Update, context: ContextTypes.DEFAULT_TYPE)
         parse_mode='HTML',
         reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
     )
-    return USER_SEND_TASK_CONTENT  # ← Переходим к отправке!
+    return USER_SEND_TASK_CONTENT  # ← ВАЖНО: меняем состояние!
     
 async def buy_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка выбора товара для покупки"""
@@ -1581,47 +1582,29 @@ async def admin_pending_submissions(update: Update, context: ContextTypes.DEFAUL
     return ADMIN_REVIEW_SELECT
 # АДМИН ФУНКЦИИ ДЛЯ ЗАДАНИЙ
 
-async def admin_create_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Начало создания задания"""
-    user_id = update.effective_user.id
-
-    if not is_admin(user_id):
-        await update.message.reply_text("❌ У вас нет доступа.")
+async def submit_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    users = load_users()
+    if user_id not in users:
+        await update.message.reply_text("❌ Вы не зарегистрированы. Используйте команду /start для регистрации.")
         return ConversationHandler.END
 
-    await update.message.reply_text(
-        "📝 <b>Создание нового задания</b>\n\n"
-        "Введите описание задания:",
-        parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
-    )
-
-    return ADMIN_CREATE_TASK
-
-
-async def admin_create_task_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Завершение создания задания - установка баллов"""
-    text = update.message.text
-
-    if text == "🔙 Отмена":
-        await update.message.reply_text(
-            "❌ Создание задания отменено.",
-            reply_markup=get_admin_keyboard()
-        )
+    tasks = load_tasks()
+    if not tasks:
+        await update.message.reply_text("📭 На данный момент активных заданий нет.", reply_markup=get_main_keyboard())
         return ConversationHandler.END
 
-    # Сохраняем описание задания
-    context.user_data['task_description'] = text
+    keyboard = []
+    for task_id, task in tasks.items():
+        keyboard.append([KeyboardButton(f"#{task_id} - {task['description'][:30]}...")])
+    keyboard.append([KeyboardButton("🔙 Отмена")])
 
     await update.message.reply_text(
-        f"📝 <b>Описание задания:</b>\n{text}\n\n"
-        "Теперь введите количество баллов за выполнение этого задания:",
+        "📋 <b>Выберите задание:</b>\nНажмите на задание, которое хотите отправить на проверку:",
         parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
-
-    return ADMIN_SET_TASK_POINTS
-
+    return USER_SELECT_TASK  # ← ВАЖНО!
 
 async def admin_set_task_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Установка баллов для задания"""
@@ -2465,15 +2448,20 @@ def main():
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
 
-    # ConversationHandler для администратора (создание заданий)
-    admin_task_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📝 Создать задание$'), admin_create_task_start)],
-        states={
-            ADMIN_CREATE_TASK: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_task_finish)],
-            ADMIN_SET_TASK_POINTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_task_points)]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
+   user_task_conv_handler = ConversationHandler(
+    entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
+    states={
+        USER_SELECT_TASK: [
+            MessageHandler(filters.Regex('^🔙 Отмена$'), cancel),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_select)
+        ],
+        USER_SEND_TASK_CONTENT: [
+            MessageHandler(filters.Regex('^🔙 Отмена$'), cancel),
+            MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT, handle_task_submission)
+        ]
+    },
+    fallbacks=[CommandHandler('cancel', cancel)]
+)
 
     # ConversationHandler для администратора (исправление ID)
     admin_fix_id_conv_handler = ConversationHandler(
@@ -2547,6 +2535,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
