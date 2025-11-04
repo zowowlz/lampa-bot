@@ -506,6 +506,7 @@ async def submit_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def submit_task_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка выбора задания перед отправкой ответа"""
     text = update.message.text
     if text == "🔙 Отмена":
         await update.message.reply_text(
@@ -514,6 +515,7 @@ async def submit_task_select(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return ConversationHandler.END
 
+    # Извлекаем ID задания из текста кнопки: "#123 - Описание..."
     try:
         task_id = text.split('#')[1].split(' - ')[0]
     except (IndexError, ValueError):
@@ -521,7 +523,7 @@ async def submit_task_select(update: Update, context: ContextTypes.DEFAULT_TYPE)
             "❌ Ошибка выбора задания. Попробуйте еще раз:",
             reply_markup=get_main_keyboard()
         )
-        return USER_SELECT_TASK
+        return USER_SUBMIT_TASK
 
     tasks = load_tasks()
     if task_id not in tasks:
@@ -531,6 +533,7 @@ async def submit_task_select(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return ConversationHandler.END
 
+    # Сохраняем выбранное задание
     context.user_data['selected_task'] = task_id
     task = tasks[task_id]
 
@@ -543,7 +546,7 @@ async def submit_task_select(update: Update, context: ContextTypes.DEFAULT_TYPE)
         parse_mode='HTML',
         reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
     )
-    return USER_SEND_TASK_CONTENT
+    return USER_SUBMIT_TASK
     
 async def buy_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка выбора товара для покупки"""
@@ -2485,17 +2488,17 @@ def main():
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
 
-    # ConversationHandler для пользователей (отправка заданий)
-    user_task_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
-        states={
-            USER_SUBMIT_TASK: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_finish),
-                MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT, handle_task_submission)
-            ]
-        },
-        fallbacks=[CommandHandler('cancel', cancel)]
-    )
+user_task_conv_handler = ConversationHandler(
+    entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
+    states={
+        USER_SUBMIT_TASK: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_select),
+            MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT,
+                           handle_task_submission)
+        ]
+    },
+    fallbacks=[CommandHandler('cancel', cancel)]
+)
 
     # Добавление обработчиков
     application.add_handler(user_conv_handler)
@@ -2526,6 +2529,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
