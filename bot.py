@@ -2233,7 +2233,15 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=get_main_keyboard(update.effective_user.id)
         )
     return ConversationHandler.END
-
+    
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Отмена для обычных пользователей"""
+    await update.message.reply_text(
+        "❌ Действие отменено.",
+        reply_markup=get_main_keyboard(update.effective_user.id)
+    )
+    return ConversationHandler.END
+    
 async def admin_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Отмена действий администратора"""
     await update.message.reply_text(
@@ -2388,6 +2396,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
