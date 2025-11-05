@@ -735,109 +735,6 @@ async def confirm_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop('selected_product_id', None)
 
     return ConversationHandler.END
-async def confirm_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка подтверждения покупки"""
-    text = update.message.text
-    user_id = str(update.effective_user.id)
-    users = load_users()
-
-    if text == "🔙 Назад к товарам":
-        return await shop(update, context)
-
-    if text in ["❌ Нет, отменить", "🔙 Назад"]:
-        await update.message.reply_text(
-            "❌ Покупка отменена.",
-            reply_markup=get_main_keyboard(update.effective_user.id)
-        )
-        return ConversationHandler.END
-
-    if text != "✅ Да, купить товар":
-        await update.message.reply_text(
-            "❌ Неизвестная команда. Пожалуйста, используйте кнопки для подтверждения.",
-            reply_markup=get_main_keyboard(update.effective_user.id)
-        )
-        return USER_CONFIRM_PURCHASE
-
-    # Получаем сохраненный товар из контекста
-    product = context.user_data.get('selected_product')
-    product_id = context.user_data.get('selected_product_id')
-
-    if not product or not product_id:
-        await update.message.reply_text(
-            "❌ Ошибка: товар не найден.",
-            reply_markup=get_main_keyboard(update.effective_user.id)
-        )
-        return ConversationHandler.END
-
-    user_data = users[user_id]
-
-    # Проверяем достаточно ли баллов (на случай если баланс изменился)
-    if user_data['points'] < product['price']:
-        await update.message.reply_text(
-            f"❌ <b>Недостаточно баллов!</b>\n\n"
-            f"💰 Стоимость товара: {product['price']} баллов\n"
-            f"💳 Ваш баланс: {user_data['points']} баллов\n"
-            f"🔻 Не хватает: {product['price'] - user_data['points']} баллов\n\n"
-            f"Пополните баланс и попробуйте снова!",
-            parse_mode='HTML',
-            reply_markup=get_main_keyboard(update.effective_user.id)
-        )
-        return ConversationHandler.END
-
-    # Списываем баллы
-    users[user_id]['points'] -= product['price']
-    save_users(users)
-
-    # Создаем заказ
-    orders = load_orders()
-    order_id = generate_unique_id(orders)
-
-    orders[order_id] = {
-        'user_id': user_id,
-        'user_name': f"{user_data['first_name']} {user_data['surname']}",
-        'user_unique_id': user_data['unique_id'],
-        'product_id': product_id,
-        'product_name': product['name'],
-        'product_description': product['description'],
-        'price': product['price'],
-        'order_time': datetime.now().isoformat(),
-        'status': 'completed'
-    }
-    save_orders(orders)
-
-    # Уведомляем администраторов
-    for admin_id in ADMIN_IDS:
-        try:
-            await context.bot.send_message(
-                chat_id=admin_id,
-                text=f"🛒 <b>Новая покупка!</b>\n\n"
-                     f"👤 <b>Покупатель:</b> {user_data['first_name']} {user_data['surname']} (ID: #{user_data['unique_id']})\n"
-                     f"🎁 <b>Товар:</b> {product['name']}\n"
-                     f"💰 <b>Цена:</b> {product['price']} баллов\n"
-                     f"🆔 <b>Заказ #:</b> {order_id}\n"
-                     f"🕒 <b>Время:</b> {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-                parse_mode='HTML'
-            )
-        except Exception as e:
-            logger.error(f"Не удалось отправить уведомление администратору {admin_id}: {e}")
-
-    await update.message.reply_text(
-        f"🎉 <b>Поздравляем с покупкой!</b>\n\n"
-        f"🎁 <b>Товар:</b> {product['name']}\n"
-        f"📝 <b>Описание:</b> {product['description']}\n"
-        f"💰 <b>Списано:</b> {product['price']} баллов\n"
-        f"💳 <b>Остаток на балансе:</b> {users[user_id]['points']} баллов\n"
-        f"🆔 <b>Номер заказа:</b> #{order_id}\n\n"
-        f"Спасибо за покупку! 🎊",
-        parse_mode='HTML',
-        reply_markup=get_main_keyboard(update.effective_user.id)
-    )
-
-    # Очищаем контекст
-    context.user_data.pop('selected_product', None)
-    context.user_data.pop('selected_product_id', None)
-
-    return ConversationHandler.END
 # Убедитесь, что эти состояния есть в начале файла
 ADMIN_CREATE_PRODUCT_NAME = 1
 ADMIN_CREATE_PRODUCT_DESCRIPTION = 2
@@ -1280,6 +1177,7 @@ async def admin_review_submission(update: Update, context: ContextTypes.DEFAULT_
         "Используйте кнопки выше для оценки задания. Кнопка 'Назад' вернет к списку заданий:",
         reply_markup=back_keyboard
     )
+    return ConversationHandler.END
     # Убираем return ADMIN_REVIEW_SELECT. Функция завершается, и бот ожидает callback от inline-кнопок.
 
 async def handle_task_submission(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2380,6 +2278,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
