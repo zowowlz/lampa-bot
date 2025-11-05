@@ -160,14 +160,14 @@ def get_main_keyboard(user_id=None):
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 def get_admin_keyboard():
-    """Клавиатура администратора"""
     keyboard = [
         [KeyboardButton("👥 Список пользователей"), KeyboardButton("⭐ Добавить баллы")],
         [KeyboardButton("📝 Создать задание"), KeyboardButton("📋 Список заданий")],
         [KeyboardButton("📨 Проверка заданий"), KeyboardButton("🛍️ Добавить товар")],
         [KeyboardButton("📦 Список товаров"), KeyboardButton("🗑️ Удалить товар")],
         [KeyboardButton("🆔 Исправить ID"), KeyboardButton("🗑️ Сбросить пользователей")],
-        [KeyboardButton("📊 Статистика"), KeyboardButton("🔙 Главное меню")]
+        [KeyboardButton("🗑️ Удалить задание"), KeyboardButton("📊 Статистика")],  # ← ДОБАВЛЕНО
+        [KeyboardButton("🔙 Главное меню")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -761,7 +761,37 @@ async def admin_create_product_start(update: Update, context: ContextTypes.DEFAU
 
     return ADMIN_CREATE_PRODUCT_NAME
 
+async def admin_delete_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показать список заданий для удаления с inline-кнопками"""
+    user_id = update.effective_user.id
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ У вас нет доступа.")
+        return
 
+    tasks = load_tasks()
+    if not tasks:
+        await update.message.reply_text(
+            "📭 Нет заданий для удаления.",
+            reply_markup=get_admin_keyboard()
+        )
+        return
+
+    keyboard = []
+    for task_id, task in tasks.items():
+        # Обрезаем описание до 20 символов
+        desc_preview = (task['description'][:20] + '...') if len(task['description']) > 20 else task['description']
+        button_text = f"#{task_id} - {desc_preview}"
+        keyboard.append([InlineKeyboardButton(button_text, callback_data=f"del_task_{task_id}")])
+
+    keyboard.append([InlineKeyboardButton("❌ Отмена", callback_data="cancel_delete_task")])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "🗑️ <b>Выберите задание для удаления:</b>",
+        parse_mode='HTML',
+        reply_markup=reply_markup
+    )
+    
 async def admin_create_product_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка названия товара"""
     text = update.message.text
@@ -810,7 +840,78 @@ async def admin_create_product_description(update: Update, context: ContextTypes
 
     return ADMIN_CREATE_PRODUCT_PRICE
 
+async def handle_delete_task_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка выбора задания для удаления и подтверждение"""
+    query = update.callback_query
+    await query.answer()
+    data = query.data
 
+    if data == "cancel_delete_task":
+        await query.edit_message_text("❌ Удаление задания отменено.", reply_markup=get_admin_keyboard())
+        return
+
+    if data.startswith("del_task_"):
+        task_id = data.split("_")[2]
+        tasks = load_tasks()
+
+        if task_id not in tasks:
+            await query.edit_message_text("❌ Задание не найдено.", reply_markup=get_admin_keyboard())
+            return
+
+        task = tasks[task_id]
+        desc_preview = (task['description'][:30] + '...') if len(task['description']) > 30 else task['description']
+
+        # Кнопки подтверждения
+        confirm_keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("✅ Да, удалить", callback_data=f"confirm_del_task_{task_id}"),
+                InlineKeyboardButton("❌ Нет", callback_data="cancel_delete_task")
+            ]
+        ])
+
+        await query.edit_message_text(
+            f"⚠️ <b>Подтверждение удаления</b>\n"
+            f"🎯 Задание #{task_id}\n"
+            f"📝 {desc_preview}\n"
+            f"⭐ Награда: {task['points']} баллов\n\n"
+            f"<b>Вы уверены?</b> Это действие необратимо.",
+            parse_mode='HTML',
+            reply_markup=confirm_keyboard
+        )
+
+async def handle_confirm_delete_task_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Финальное удаление задания"""
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+
+    if data.startswith("confirm_del_task_"):
+        task_id = data.split("_")[3]
+        tasks = load_tasks()
+
+        if task_id not in tasks:
+            await query.edit_message_text("❌ Задание уже удалено или не найдено.")
+            return
+
+        task_info = tasks[task_id]
+        del tasks[task_id]
+        save_tasks(tasks)
+
+        # Опционально: удаляем все связанные отправки (submissions)
+        submissions = load_submissions()
+        to_delete = [sid for sid, sub in submissions.items() if sub.get('task_id') == task_id]
+        for sid in to_delete:
+            del submissions[sid]
+        save_submissions(submissions)
+
+        await query.edit_message_text(
+            f"✅ <b>Задание удалено!</b>\n"
+            f"🗑️ ID: #{task_id}\n"
+            f"📝 Описание: {task_info['description']}\n"
+            f"⭐ Баллы: {task_info['points']}",
+            parse_mode='HTML'
+        )
+        
 async def admin_create_product_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка цены товара и запрос количества"""
     text = update.message.text
@@ -2265,6 +2366,10 @@ def main():
     application.add_handler(CallbackQueryHandler(handle_confirm_delete_callback, pattern='^confirm_delete_'))
     application.add_handler(CallbackQueryHandler(handle_delete_cancel_final, pattern='^delete_cancel_final'))
     application.add_handler(CallbackQueryHandler(handle_delete_product_callback, pattern='^delete_cancel'))
+    application.add_handler(MessageHandler(filters.Regex('^🗑️ Удалить задание$'), admin_delete_task))
+    application.add_handler(CallbackQueryHandler(handle_delete_task_callback, pattern='^del_task_'))
+    application.add_handler(CallbackQueryHandler(handle_confirm_delete_task_callback, pattern='^confirm_del_task_'))
+    application.add_handler(CallbackQueryHandler(lambda u, c: u.callback_query.edit_message_text("❌ Удаление отменено.", reply_markup=get_admin_keyboard()), pattern='^cancel_delete_task$'))
 
     application.add_handler(CallbackQueryHandler(handle_submission_callback))
     application.add_handler(CommandHandler('admin', admin_panel))
@@ -2278,6 +2383,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
