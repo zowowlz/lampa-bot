@@ -1201,11 +1201,9 @@ async def admin_products_list(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def admin_review_submission(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Просмотр выбранного задания для оценки"""
     text = update.message.text
-
     if text == "🔙 Назад":
         # Возвращаем к списку заданий, а не сразу в меню администратора
         return await admin_pending_submissions(update, context)
-
     # Извлекаем ID отправки из текста
     try:
         submission_id = text.split('#')[1].split(' - ')[0]
@@ -1214,19 +1212,15 @@ async def admin_review_submission(update: Update, context: ContextTypes.DEFAULT_
             "❌ Ошибка выбора задания. Попробуйте еще раз:",
             reply_markup=get_admin_keyboard()
         )
-        return ADMIN_REVIEW_SELECT
-
+        return  # Убираем return ADMIN_REVIEW_SELECT
     submissions = load_submissions()
-
     if submission_id not in submissions:
         await update.message.reply_text(
             "❌ Отправка не найдена.",
             reply_markup=get_admin_keyboard()
         )
-        return ConversationHandler.END
-
+        return  # Убираем return ADMIN_REVIEW_SELECT
     submission = submissions[submission_id]
-
     # Создаем клавиатуру для оценки
     keyboard = InlineKeyboardMarkup([
         [
@@ -1234,26 +1228,30 @@ async def admin_review_submission(update: Update, context: ContextTypes.DEFAULT_
             InlineKeyboardButton("❌ Отклонить", callback_data=f"reject_{submission_id}")
         ]
     ])
-
     # Формируем информацию о задании
     submission_info = (
-        f"📨 <b>Задание на проверке</b>\n\n"
-        f"👤 <b>Пользователь:</b> {submission['user_name']} (ID: #{submission['user_unique_id']})\n"
-        f"🎯 <b>Задание:</b> {submission['task_description']}\n"
-        f"⭐ <b>Баллы:</b> {submission['task_points']}\n"
-        f"📎 <b>Тип ответа:</b> {submission['content_type']}\n"
+        f"📨 <b>Задание на проверке</b>
+"
+        f"👤 <b>Пользователь:</b> {submission['user_name']} (ID: #{submission['user_unique_id']})
+"
+        f"🎯 <b>Задание:</b> {submission['task_description']}
+"
+        f"⭐ <b>Баллы:</b> {submission['task_points']}
+"
+        f"📎 <b>Тип ответа:</b> {submission['content_type']}
+"
         f"🕒 <b>Время отправки:</b> {submission['submission_time'][:16]}"
     )
-
     # Добавляем содержание в зависимости от типа контента
     if submission['content_type'] == 'text' and submission['content']:
-        submission_info += f"\n\n📝 <b>Ответ:</b>\n{submission['content']}"
+        submission_info += f"
+📝 <b>Ответ:</b>
+{submission['content']}"
     elif submission['content_type'] in ['photo', 'document', 'video'] and submission['content']:
-        submission_info += f"\n\n📎 <b>Файл:</b> {submission['content']}"
-
+        submission_info += f"
+📎 <b>Файл:</b> {submission['content']}"
     # Убираем кнопки и оставляем только "Назад"
     back_keyboard = ReplyKeyboardMarkup([[KeyboardButton("🔙 Назад")]], resize_keyboard=True)
-
     # Отправляем сообщение с медиа или текстом
     if submission['content_type'] == 'photo' and submission['file_id']:
         await context.bot.send_photo(
@@ -1285,14 +1283,12 @@ async def admin_review_submission(update: Update, context: ContextTypes.DEFAULT_
             parse_mode='HTML',
             reply_markup=keyboard
         )
-
     # Отправляем отдельное сообщение с кнопкой "Назад"
     await update.message.reply_text(
         "Используйте кнопки выше для оценки задания. Кнопка 'Назад' вернет к списку заданий:",
         reply_markup=back_keyboard
     )
-
-    return ADMIN_REVIEW_SELECT
+    # Убираем return ADMIN_REVIEW_SELECT. Функция завершается, и бот ожидает callback от inline-кнопок.
 
 async def handle_task_submission(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка отправленного задания"""
@@ -2482,6 +2478,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
