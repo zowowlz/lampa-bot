@@ -1229,19 +1229,14 @@ async def admin_review_submission(update: Update, context: ContextTypes.DEFAULT_
         ]
     ])
     # Формируем информацию о задании
-    submission_info = (
-        f"📨 <b>Задание на проверке</b>
-"
-        f"👤 <b>Пользователь:</b> {submission['user_name']} (ID: #{submission['user_unique_id']})
-"
-        f"🎯 <b>Задание:</b> {submission['task_description']}
-"
-        f"⭐ <b>Баллы:</b> {submission['task_points']}
-"
-        f"📎 <b>Тип ответа:</b> {submission['content_type']}
-"
-        f"🕒 <b>Время отправки:</b> {submission['submission_time'][:16]}"
-    )
+submission_info = (
+    f"📨 <b>Задание на проверке</b>\n"
+    f"👤 <b>Пользователь:</b> {submission['user_name']} (ID: #{submission['user_unique_id']})\n"
+    f"🎯 <b>Задание:</b> {submission['task_description']}\n"
+    f"⭐ <b>Баллы:</b> {submission['task_points']}\n"
+    f"📎 <b>Тип ответа:</b> {submission['content_type']}\n"
+    f"🕒 <b>Время отправки:</b> {submission['submission_time'][:16]}"
+)
     # Добавляем содержание в зависимости от типа контента
     if submission['content_type'] == 'text' and submission['content']:
         submission_info += f"
@@ -2478,6 +2473,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
