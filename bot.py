@@ -2200,7 +2200,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "👨‍💼 Панель администратора":
         await admin_panel(update, context)
 
-    # Обработка кнопок администратора (из админ-панели)
+    # Обработка кнопок администратора
     elif text == "👥 Список пользователей":
         await admin_users_list(update, context)
     elif text == "⭐ Добавить баллы":
@@ -2209,6 +2209,8 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await admin_create_task_start(update, context)
     elif text == "📋 Список заданий":
         await admin_tasks_list(update, context)
+    elif text == "📨 Проверка заданий":
+        await admin_pending_submissions(update, context)
     elif text == "🛍️ Добавить товар":
         await admin_create_product_start(update, context)
     elif text == "📦 Список товаров":
@@ -2219,14 +2221,17 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await admin_reset_users_start(update, context)
     elif text == "🗑️ Удалить товар":
         await admin_delete_product(update, context)
+    elif text == "🗑️ Удалить задание":
+        await admin_delete_task(update, context)
     elif text == "📊 Статистика":
         await admin_stats(update, context)
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отмена для пользователей"""
-    await update.message.reply_text(
-        "❌ Действие отменено.",
-        reply_markup=get_main_keyboard(update.effective_user.id)
-    )
+
+    # 🔽 Вот это добавьте:
+    elif text == "🔙 Главное меню":
+        await update.message.reply_text(
+            "🔙 Вы вернулись в главное меню.",
+            reply_markup=get_main_keyboard(update.effective_user.id)
+        )
     return ConversationHandler.END
 
 async def admin_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2383,6 +2388,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
