@@ -1394,81 +1394,70 @@ async def handle_submission_callback(update: Update, context: ContextTypes.DEFAU
     """Обработка callback от кнопок принятия/отклонения"""
     query = update.callback_query
     await query.answer()
-
     data = query.data
     submission_id = data.split('_')[1]
     action = data.split('_')[0]
-
     submissions = load_submissions()
     users = load_users()
-
     if submission_id not in submissions:
         await query.edit_message_text("❌ Отправка не найдена.")
         return
 
     submission = submissions[submission_id]
     user_id = submission['user_id']
-
+    
     if action == 'approve':
-        # Начисляем баллы
         if user_id in users:
             users[user_id]['points'] += submission['task_points']
             save_users(users)
-
             submission['status'] = 'approved'
             save_submissions(submissions)
-
-            # Уведомляем пользователя
             try:
                 await context.bot.send_message(
                     chat_id=user_id,
-                    text=f"🎉 <b>Ваше задание принято!</b>\n\n"
+                    text=f"🎉 <b>Ваше задание принято!</b>\n"
                          f"🎯 Задание: {submission['task_description']}\n"
                          f"⭐ Начислено баллов: +{submission['task_points']}\n"
-                         f"💰 Теперь у вас: {users[user_id]['points']} баллов\n\n"
+                         f"💰 Теперь у вас: {users[user_id]['points']} баллов\n"
                          f"Поздравляем! 🎊",
                     parse_mode='HTML'
                 )
             except Exception as e:
                 logger.error(f"Не удалось уведомить пользователя {user_id}: {e}")
-
             await query.edit_message_text(
-                f"✅ <b>Задание принято!</b>\n\n"
+                f"✅ <b>Задание принято!</b>\n"
                 f"👤 Пользователь: {submission['user_name']}\n"
                 f"🎯 Задание: {submission['task_description']}\n"
                 f"⭐ Начислено баллов: {submission['task_points']}\n"
                 f"💰 Новый баланс: {users[user_id]['points']}",
                 parse_mode='HTML'
             )
-
     elif action == 'reject':
         submission['status'] = 'rejected'
         save_submissions(submissions)
-
-        # Уведомляем пользователя
         try:
             await context.bot.send_message(
                 chat_id=user_id,
-                text=f"❌ <b>Ваше задание отклонено</b>\n\n"
+                text=f"❌ <b>Ваше задание отклонено</b>\n"
                      f"🎯 Задание: {submission['task_description']}\n"
                      f"💡 Попробуйте выполнить задание еще раз или выберите другое задание.",
                 parse_mode='HTML'
             )
         except Exception as e:
             logger.error(f"Не удалось уведомить пользователя {user_id}: {e}")
-
         await query.edit_message_text(
-            f"❌ <b>Задание отклонено</b>\n\n"
+            f"❌ <b>Задание отклонено</b>\n"
             f"👤 Пользователь: {submission['user_name']}\n"
             f"🎯 Задание: {submission['task_description']}",
             parse_mode='HTML'
         )
-# После принятия/отклонения
-await query.message.reply_text(
-    "✅ Задание обработано. Нажмите «📨 Проверка заданий» в меню, чтобы продолжить.",
-    reply_markup=get_admin_keyboard()
-)
-return ConversationHandler.END  # Завершаем состояние!
+
+    # ✅ ЭТО ДОЛЖНО БЫТЬ ВНУТРИ ФУНКЦИИ!
+    await query.message.reply_text(
+        "✅ Задание обработано. Нажмите «📨 Проверка заданий» в меню, чтобы продолжить.",
+        reply_markup=get_admin_keyboard()
+    )
+    return ConversationHandler.END
 
 async def admin_create_product_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Завершение создания товара - установка описания"""
@@ -1662,85 +1651,6 @@ async def admin_tasks_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode='HTML',
         reply_markup=get_admin_keyboard()
     )
-
-
-async def handle_submission_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка callback от кнопок принятия/отклонения"""
-    query = update.callback_query
-    await query.answer()
-
-    data = query.data
-    submission_id = data.split('_')[1]
-    action = data.split('_')[0]
-
-    submissions = load_submissions()
-    users = load_users()
-
-    if submission_id not in submissions:
-        await query.edit_message_text("❌ Отправка не найдена.")
-        return
-
-    submission = submissions[submission_id]
-    user_id = submission['user_id']
-
-    if action == 'approve':
-        # Начисляем баллы
-        if user_id in users:
-            users[user_id]['points'] += submission['task_points']
-            save_users(users)
-
-            submission['status'] = 'approved'
-            save_submissions(submissions)
-
-            # Уведомляем пользователя
-            try:
-                await context.bot.send_message(
-                    chat_id=user_id,
-                    text=f"🎉 <b>Ваше задание принято!</b>\n\n"
-                         f"🎯 Задание: {submission['task_description']}\n"
-                         f"⭐ Начислено баллов: +{submission['task_points']}\n"
-                         f"💰 Теперь у вас: {users[user_id]['points']} баллов\n\n"
-                         f"Поздравляем! 🎊",
-                    parse_mode='HTML'
-                )
-            except Exception as e:
-                logger.error(f"Не удалось уведомить пользователя {user_id}: {e}")
-
-            await query.edit_message_text(
-                f"✅ <b>Задание принято!</b>\n\n"
-                f"👤 Пользователь: {submission['user_name']}\n"
-                f"🎯 Задание: {submission['task_description']}\n"
-                f"⭐ Начислено баллов: {submission['task_points']}\n"
-                f"💰 Новый баланс: {users[user_id]['points']}",
-                parse_mode='HTML'
-            )
-
-    elif action == 'reject':
-        submission['status'] = 'rejected'
-        save_submissions(submissions)
-
-        # Уведомляем пользователя
-        try:
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=f"❌ <b>Ваше задание отклонено</b>\n\n"
-                     f"🎯 Задание: {submission['task_description']}\n"
-                     f"💡 Попробуйте выполнить задание еще раз или выберите другое задание.",
-                parse_mode='HTML'
-            )
-        except Exception as e:
-            logger.error(f"Не удалось уведомить пользователя {user_id}: {e}")
-
-        await query.edit_message_text(
-            f"❌ <b>Задание отклонено</b>\n\n"
-            f"👤 Пользователь: {submission['user_name']}\n"
-            f"🎯 Задание: {submission['task_description']}",
-            parse_mode='HTML'
-        )
-
-    # После принятия/отклонения автоматически возвращаем к списку заданий
-    await show_pending_submissions_after_review(context, update.effective_chat.id)
-
 
 async def show_pending_submissions_after_review(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     """Показать список заданий после принятия/отклонения"""
@@ -2472,6 +2382,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
