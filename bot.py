@@ -2210,8 +2210,6 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await admin_create_task_start(update, context)
     elif text == "📋 Список заданий":
         await admin_tasks_list(update, context)
-    elif text == "📨 Проверка заданий":
-        await admin_pending_submissions(update, context)
     elif text == "🛍️ Добавить товар":
         await admin_create_product_start(update, context)
     elif text == "📦 Список товаров":
@@ -2329,15 +2327,15 @@ def main():
     )
 
     admin_review_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📨 Проверка заданий$'), admin_pending_submissions)],
-        states={
-            ADMIN_REVIEW_SELECT: [
-                MessageHandler(filters.Regex('^🔙 Назад$'), lambda u, c: admin_cancel(u, c)),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_review_submission)
-            ]
-        },
-        fallbacks=[CommandHandler('cancel', admin_cancel)]
-    )
+    entry_points=[MessageHandler(filters.Regex('^📨 Проверка заданий$'), admin_pending_submissions)],
+    states={
+        ADMIN_REVIEW_SELECT: [
+            MessageHandler(filters.Regex('^🔙 Назад$'), lambda u, c: admin_cancel(u, c)),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, admin_review_submission)
+        ]
+    },
+    fallbacks=[CommandHandler('cancel', admin_cancel)]
+)
 
     user_task_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
@@ -2382,6 +2380,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
