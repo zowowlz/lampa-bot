@@ -1228,23 +1228,20 @@ async def admin_review_submission(update: Update, context: ContextTypes.DEFAULT_
             InlineKeyboardButton("❌ Отклонить", callback_data=f"reject_{submission_id}")
         ]
     ])
-    # Формируем информацию о задании
-submission_info = (
-    f"📨 <b>Задание на проверке</b>\n"
-    f"👤 <b>Пользователь:</b> {submission['user_name']} (ID: #{submission['user_unique_id']})\n"
-    f"🎯 <b>Задание:</b> {submission['task_description']}\n"
-    f"⭐ <b>Баллы:</b> {submission['task_points']}\n"
-    f"📎 <b>Тип ответа:</b> {submission['content_type']}\n"
-    f"🕒 <b>Время отправки:</b> {submission['submission_time'][:16]}"
-)
+    
+    submission_info = (
+        f"📨 <b>Задание на проверке</b>\n"
+        f"👤 <b>Пользователь:</b> {submission['user_name']} (ID: #{submission['user_unique_id']})\n"
+        f"🎯 <b>Задание:</b> {submission['task_description']}\n"
+        f"⭐ <b>Баллы:</b> {submission['task_points']}\n"
+        f"📎 <b>Тип ответа:</b> {submission['content_type']}\n"
+        f"🕒 <b>Время отправки:</b> {submission['submission_time'][:16]}"
+    )
     # Добавляем содержание в зависимости от типа контента
     if submission['content_type'] == 'text' and submission['content']:
-        submission_info += f"
-📝 <b>Ответ:</b>
-{submission['content']}"
+        submission_info += f"\n📝 <b>Ответ:</b>\n{submission['content']}"
     elif submission['content_type'] in ['photo', 'document', 'video'] and submission['content']:
-        submission_info += f"
-📎 <b>Файл:</b> {submission['content']}"
+        submission_info += f"\n📎 <b>Файл:</b> {submission['content']}"
     # Убираем кнопки и оставляем только "Назад"
     back_keyboard = ReplyKeyboardMarkup([[KeyboardButton("🔙 Назад")]], resize_keyboard=True)
     # Отправляем сообщение с медиа или текстом
@@ -2473,6 +2470,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
