@@ -1212,14 +1212,14 @@ async def admin_review_submission(update: Update, context: ContextTypes.DEFAULT_
             "❌ Ошибка выбора задания. Попробуйте еще раз:",
             reply_markup=get_admin_keyboard()
         )
-        return  # Убираем return ADMIN_REVIEW_SELECT
+        return ConversationHandler.END
     submissions = load_submissions()
     if submission_id not in submissions:
         await update.message.reply_text(
             "❌ Отправка не найдена.",
             reply_markup=get_admin_keyboard()
         )
-        return  # Убираем return ADMIN_REVIEW_SELECT
+        return ConversationHandler.END
     submission = submissions[submission_id]
     # Создаем клавиатуру для оценки
     keyboard = InlineKeyboardMarkup([
@@ -1308,7 +1308,7 @@ async def handle_task_submission(update: Update, context: ContextTypes.DEFAULT_T
 
     # Сохраняем отправку задания
     submissions = load_submissions()
-    submission_id = str(generate_unique_id(submissions))
+    submission_id = str(generate_task_id(submissions))
 
     # Определяем тип контента
     content_type = "text"
@@ -1463,10 +1463,12 @@ async def handle_submission_callback(update: Update, context: ContextTypes.DEFAU
             f"🎯 Задание: {submission['task_description']}",
             parse_mode='HTML'
         )
-
-    # После принятия/отклонения автоматически возвращаем к списку заданий
-    await show_pending_submissions_after_review(context, update.effective_chat.id)  # ИСПРАВЛЕНО: убрали лишний параметр
-
+# После принятия/отклонения
+await query.message.reply_text(
+    "✅ Задание обработано. Нажмите «📨 Проверка заданий» в меню, чтобы продолжить.",
+    reply_markup=get_admin_keyboard()
+)
+return ConversationHandler.END  # Завершаем состояние!
 
 async def admin_create_product_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Завершение создания товара - установка описания"""
@@ -2470,6 +2472,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
