@@ -50,7 +50,7 @@ PRODUCTS_FILE = 'products_data.json'
 ORDERS_FILE = 'orders_data.json'
 
 # ID администратора (замените на ваш Telegram ID)
-ADMIN_IDS = [424081501]  # Замените на ваш реальный ID
+ADMIN_IDS = [977306004]  # Замените на ваш реальный ID
 
 
 def load_products():
@@ -2396,6 +2396,7 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
+
 
 
 
