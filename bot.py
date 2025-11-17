@@ -41,6 +41,8 @@ USER_CONFIRM_PURCHASE = 2
 ADMIN_CONFIRM_RESET = 1
 ADMIN_DELETE_PRODUCT = 6
 ADMIN_SET_PRODUCT_QUANTITY = 7
+ADMIN_CREATE_TASK_TITLE = 8
+ADMIN_CREATE_TASK_TYPE = 9
 
 # Файлы для хранения данных
 DATA_FILE = 'users_data.json'
@@ -166,7 +168,7 @@ def get_admin_keyboard():
         [KeyboardButton("📨 Проверка заданий"), KeyboardButton("🛍️ Добавить товар")],
         [KeyboardButton("📦 Список товаров"), KeyboardButton("🗑️ Удалить товар")],
         [KeyboardButton("🆔 Исправить ID"), KeyboardButton("🗑️ Сбросить пользователей")],
-        [KeyboardButton("🗑️ Удалить задание"), KeyboardButton("📊 Статистика")],  # ← ДОБАВЛЕНО
+        [KeyboardButton("🗑️ Удалить задание"), KeyboardButton("📊 Статистика")],
         [KeyboardButton("🔙 Главное меню")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -468,52 +470,7 @@ async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     return USER_BUY_PRODUCT
-async def admin_create_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Начало создания задания"""
-    user_id = update.effective_user.id
-    if not is_admin(user_id):
-        await update.message.reply_text("❌ У вас нет доступа.")
-        return ConversationHandler.END
-    await update.message.reply_text(
-        "📝 <b>Создание нового задания</b>\n"
-        "Введите описание задания:",
-        parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
-    )
-    return ADMIN_CREATE_TASK
 
-async def submit_task_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка выбора задания"""
-    text = update.message.text
-    if text == "🔙 Отмена":
-        await update.message.reply_text("❌ Отправка задания отменена.", reply_markup=get_main_keyboard())
-        return ConversationHandler.END
-
-    try:
-        task_id = text.split('#')[1].split(' - ')[0]
-    except (IndexError, ValueError):
-        await update.message.reply_text("❌ Ошибка выбора задания. Попробуйте еще раз:", reply_markup=get_main_keyboard())
-        return USER_SELECT_TASK
-
-    tasks = load_tasks()
-    if task_id not in tasks:
-        await update.message.reply_text("❌ Задание не найдено.", reply_markup=get_main_keyboard())
-        return ConversationHandler.END
-
-    context.user_data['selected_task'] = task_id
-    task = tasks[task_id]
-
-    await update.message.reply_text(
-        f"📤 <b>Отправка задания:</b>\n"
-        f"🎯 Задание #{task_id}\n"
-        f"📝 {task['description']}\n"
-        f"⭐ Награда: {task['points']} баллов\n"
-        f"📎 Прикрепите файл, фото, видео или напишите текстовый ответ:",
-        parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
-    )
-    return USER_SEND_TASK_CONTENT  # ← ВАЖНО: меняем состояние!
-    
 async def buy_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка выбора товара для покупки"""
     text = update.message.text
@@ -735,10 +692,6 @@ async def confirm_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop('selected_product_id', None)
 
     return ConversationHandler.END
-# Убедитесь, что эти состояния есть в начале файла
-ADMIN_CREATE_PRODUCT_NAME = 1
-ADMIN_CREATE_PRODUCT_DESCRIPTION = 2
-ADMIN_CREATE_PRODUCT_PRICE = 3
 
 async def admin_create_product_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начало создания товара"""
@@ -1332,8 +1285,10 @@ async def handle_task_submission(update: Update, context: ContextTypes.DEFAULT_T
         'user_name': f"{user_data['first_name']} {user_data['surname']}",
         'user_unique_id': user_data['unique_id'],
         'task_id': task_id,
+        'task_title': task.get('title', 'Без названия'),
         'task_description': task['description'],
         'task_points': task['points'],
+        'task_type': task.get('type', 'once'),
         'content_type': content_type,
         'content': content,
         'file_id': file_id,
@@ -1541,34 +1496,153 @@ async def admin_pending_submissions(update: Update, context: ContextTypes.DEFAUL
     )
 
     return ADMIN_REVIEW_SELECT
-# АДМИН ФУНКЦИИ ДЛЯ ЗАДАНИЙ
 
-async def submit_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    users = load_users()
-    if user_id not in users:
-        await update.message.reply_text("❌ Вы не зарегистрированы. Используйте команду /start для регистрации.")
+async def submit_task_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка выбора задания"""
+    text = update.message.text
+    if text == "🔙 Отмена":
+        await update.message.reply_text("❌ Отправка задания отменена.", reply_markup=get_main_keyboard())
         return ConversationHandler.END
+
+    try:
+        task_id = text.split('#')[1].split(' - ')[0]
+    except (IndexError, ValueError):
+        await update.message.reply_text("❌ Ошибка выбора задания. Попробуйте еще раз:", reply_markup=get_main_keyboard())
+        return USER_SELECT_TASK
 
     tasks = load_tasks()
-    if not tasks:
-        await update.message.reply_text("📭 На данный момент активных заданий нет.", reply_markup=get_main_keyboard())
+    if task_id not in tasks:
+        await update.message.reply_text("❌ Задание не найдено.", reply_markup=get_main_keyboard())
         return ConversationHandler.END
 
-    keyboard = []
-    for task_id, task in tasks.items():
-        keyboard.append([KeyboardButton(f"Выбрать задание #{task_id}")])
-    keyboard.append([KeyboardButton("🔙 Отмена")])
+    # Проверяем возможность выполнения задания
+    user_id = str(update.effective_user.id)
+    task = tasks[task_id]
+    
+    can_submit, message = await check_task_availability(user_id, task_id, task)
+    if not can_submit:
+        await update.message.reply_text(
+            message,
+            reply_markup=get_main_keyboard()
+        )
+        return ConversationHandler.END
+
+    context.user_data['selected_task'] = task_id
+
+    task_type = task.get('type', 'once')
+    type_text = "одноразовое" if task_type == "once" else "ежедневное"
 
     await update.message.reply_text(
-        "📋 <b>Выберите задание:</b>\nНажмите на задание, которое хотите отправить на проверку:",
+        f"📤 <b>Отправка задания:</b>\n"
+        f"🎯 Задание #{task_id} ({type_text})\n"
+        f"📝 <b>Название:</b> {task.get('title', 'Без названия')}\n"
+        f"📄 <b>Описание:</b> {task['description']}\n"
+        f"⭐ <b>Награда:</b> {task['points']} баллов\n\n"
+        f"📎 Прикрепите файл, фото, видео или напишите текстовый ответ:",
         parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
     )
-    return USER_SELECT_TASK  # ← ВАЖНО!
+    return USER_SEND_TASK_CONTENT
+
+async def check_task_availability(user_id: str, task_id: str, task: dict) -> tuple:
+    """Проверяет, может ли пользователь выполнить задание"""
+    submissions = load_submissions()
+    task_type = task.get('type', 'once')
+    
+    if task_type == 'once':
+        # Проверяем, есть ли уже принятая отправка этого задания
+        for submission in submissions.values():
+            if (submission['user_id'] == user_id and 
+                submission['task_id'] == task_id and 
+                submission['status'] == 'approved'):
+                return False, "❌ Вы уже выполнили это одноразовое задание!"
+                
+    elif task_type == 'daily':
+        # Проверяем отправки за последние 24 часа
+        now = datetime.now()
+        for submission in submissions.values():
+            if (submission['user_id'] == user_id and 
+                submission['task_id'] == task_id and 
+                submission['status'] == 'approved'):
+                
+                submission_time = datetime.fromisoformat(submission['submission_time'])
+                time_diff = now - submission_time
+                
+                if time_diff.total_seconds() < 24 * 3600:  # 24 часа
+                    hours_left = 24 - (time_diff.total_seconds() / 3600)
+                    return False, (
+                        f"⏰ Вы уже выполняли это задание сегодня!\n"
+                        f"Следующая попытка будет доступна через {hours_left:.1f} часов"
+                    )
+    
+    return True, ""
+
+async def admin_create_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Начало создания задания"""
+    user_id = update.effective_user.id
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ У вас нет доступа.")
+        return ConversationHandler.END
+    
+    # Очищаем контекст
+    context.user_data.pop('task_title', None)
+    context.user_data.pop('task_description', None)
+    
+    await update.message.reply_text(
+        "📝 <b>Создание нового задания</b>\n\n"
+        "Введите название задания:",
+        parse_mode='HTML',
+        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
+    )
+    return ADMIN_CREATE_TASK_TITLE
+
+async def admin_create_task_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка названия задания"""
+    text = update.message.text
+
+    if text == "🔙 Отмена":
+        await update.message.reply_text(
+            "❌ Создание задания отменено.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
+
+    # Сохраняем название задания
+    context.user_data['task_title'] = text
+
+    await update.message.reply_text(
+        f"📝 <b>Название задания:</b> {text}\n\n"
+        "Теперь введите описание задания:",
+        parse_mode='HTML',
+        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
+    )
+    return ADMIN_CREATE_TASK
+
+async def admin_create_task_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка описания задания"""
+    text = update.message.text
+
+    if text == "🔙 Отмена":
+        await update.message.reply_text(
+            "❌ Создание задания отменено.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
+
+    # Сохраняем описание задания
+    context.user_data['task_description'] = text
+
+    await update.message.reply_text(
+        f"📝 <b>Название задания:</b> {context.user_data['task_title']}\n"
+        f"📄 <b>Описание задания:</b> {text}\n\n"
+        "Теперь введите количество баллов за выполнение:",
+        parse_mode='HTML',
+        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
+    )
+    return ADMIN_SET_TASK_POINTS
 
 async def admin_set_task_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Установка баллов для задания"""
+    """Установка баллов для задания и выбор типа"""
     text = update.message.text
 
     if text == "🔙 Отмена":
@@ -1591,29 +1665,95 @@ async def admin_set_task_points(update: Update, context: ContextTypes.DEFAULT_TY
         )
         return ADMIN_SET_TASK_POINTS
 
+    # Сохраняем баллы
+    context.user_data['task_points'] = points
+
+    # Создаем клавиатуру для выбора типа задания
+    keyboard = [
+        [KeyboardButton("✅ Одноразовое задание"), KeyboardButton("🔄 Ежедневное задание")],
+        [KeyboardButton("🔙 Отмена")]
+    ]
+
+    await update.message.reply_text(
+        f"📝 <b>Название задания:</b> {context.user_data['task_title']}\n"
+        f"📄 <b>Описание задания:</b> {context.user_data['task_description']}\n"
+        f"⭐ <b>Баллы:</b> {points}\n\n"
+        "Выберите тип задания:\n\n"
+        "✅ <b>Одноразовое</b> - можно выполнить только один раз\n"
+        "🔄 <b>Ежедневное</b> - можно выполнять раз в сутки",
+        parse_mode='HTML',
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    )
+    return ADMIN_CREATE_TASK_TYPE
+
+async def admin_create_task_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка выбора типа задания и сохранение"""
+    text = update.message.text
+
+    if text == "🔙 Отмена":
+        await update.message.reply_text(
+            "❌ Создание задания отменено.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
+
+    if text not in ["✅ Одноразовое задание", "🔄 Ежедневное задание"]:
+        await update.message.reply_text(
+            "❌ Пожалуйста, выберите тип задания используя кнопки:",
+            reply_markup=ReplyKeyboardMarkup([
+                [KeyboardButton("✅ Одноразовое задание"), KeyboardButton("🔄 Ежедневное задание")],
+                [KeyboardButton("🔙 Отмена")]
+            ], resize_keyboard=True)
+        )
+        return ADMIN_CREATE_TASK_TYPE
+
+    # Определяем тип задания
+    task_type = "once" if text == "✅ Одноразовое задание" else "daily"
+
+    # Получаем данные из контекста
+    task_title = context.user_data.get('task_title')
     task_description = context.user_data.get('task_description')
+    task_points = context.user_data.get('task_points')
+
+    if not all([task_title, task_description, task_points]):
+        await update.message.reply_text(
+            "❌ Ошибка: данные задания не найдены. Начните заново.",
+            reply_markup=get_admin_keyboard()
+        )
+        return ConversationHandler.END
 
     # Сохраняем задание
     tasks = load_tasks()
-    task_id = str(generate_task_id(tasks))  # ИСПРАВЛЕНО: используем generate_task_id
+    task_id = str(generate_task_id(tasks))
 
     tasks[task_id] = {
+        'title': task_title,
         'description': task_description,
-        'points': points,
+        'points': task_points,
+        'type': task_type,
         'created_at': datetime.now().isoformat(),
         'created_by': update.effective_user.id
     }
     save_tasks(tasks)
 
+    type_text = "одноразовое" if task_type == "once" else "ежедневное"
+
     await update.message.reply_text(
         f"✅ <b>Задание успешно создано!</b>\n\n"
         f"🎯 Задание #{task_id}\n"
-        f"📝 Описание: {task_description}\n"
-        f"⭐ Баллы: {points}\n\n"
+        f"📝 Название: {task_title}\n"
+        f"📄 Описание: {task_description}\n"
+        f"⭐ Баллы: {task_points}\n"
+        f"🔄 Тип: {type_text}\n\n"
         f"Теперь пользователи могут видеть это задание и отправлять его на проверку.",
         parse_mode='HTML',
         reply_markup=get_admin_keyboard()
     )
+
+    # Очищаем контекст
+    context.user_data.pop('task_title', None)
+    context.user_data.pop('task_description', None)
+    context.user_data.pop('task_points', None)
 
     return ConversationHandler.END
 
@@ -1637,11 +1777,16 @@ async def admin_tasks_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tasks_text = "📋 <b>Список заданий:</b>\n\n"
 
     for task_id, task in tasks.items():
+        task_type = task.get('type', 'once')
+        type_icon = "✅" if task_type == "once" else "🔄"
+        type_text = "Одноразовое" if task_type == "once" else "Ежедневное"
+        
         tasks_text += (
-            f"🎯 <b>Задание #{task_id}</b>\n"
-            f"📝 {task['description']}\n"
-            f"⭐ Баллы: {task['points']}\n"
-            f"📅 Создано: {task.get('created_at', 'Неизвестно')[:10]}\n"
+            f"{type_icon} <b>Задание #{task_id}</b> ({type_text})\n"
+            f"📝 <b>Название:</b> {task.get('title', 'Без названия')}\n"
+            f"📄 <b>Описание:</b> {task['description']}\n"
+            f"⭐ <b>Баллы:</b> {task['points']}\n"
+            f"📅 <b>Создано:</b> {task.get('created_at', 'Неизвестно')[:10]}\n"
             f"────────────────────\n"
         )
 
@@ -1651,34 +1796,43 @@ async def admin_tasks_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=get_admin_keyboard()
     )
 
-async def show_pending_submissions_after_review(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
-    """Показать список заданий после принятия/отклонения"""
-    submissions = load_submissions()
-    pending_subs = {k: v for k, v in submissions.items() if v['status'] == 'pending'}
+async def submit_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    users = load_users()
+    if user_id not in users:
+        await update.message.reply_text("❌ Вы не зарегистрированы. Используйте команду /start для регистрации.")
+        return ConversationHandler.END
 
-    if not pending_subs:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="✅ Заданий на проверке нет.",
-            reply_markup=get_admin_keyboard()
-        )
-        return
+    tasks = load_tasks()
+    if not tasks:
+        await update.message.reply_text("📭 На данный момент активных заданий нет.", reply_markup=get_main_keyboard())
+        return ConversationHandler.END
 
-    # Создаем клавиатуру с заданиями на проверке
     keyboard = []
-    for sub_id, submission in pending_subs.items():
-        keyboard.append([KeyboardButton(
-            f"#{sub_id} - {submission['user_name']} - {submission['task_description'][:30]}..."
-        )])
+    for task_id, task in tasks.items():
+        task_type = task.get('type', 'once')
+        type_icon = "✅" if task_type == "once" else "🔄"
+        
+        # Проверяем доступность задания
+        can_submit, _ = await check_task_availability(user_id, task_id, task)
+        status_icon = "🟢" if can_submit else "🔴"
+        
+        button_text = f"{status_icon} {type_icon} Задание #{task_id} - {task.get('title', 'Без названия')}"
+        keyboard.append([KeyboardButton(button_text)])
+    
+    keyboard.append([KeyboardButton("🔙 Отмена")])
 
-    keyboard.append([KeyboardButton("🔙 Назад")])
-
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text="📨 <b>Задания на проверке:</b>\n\nВыберите задание для оценки:",
+    await update.message.reply_text(
+        "📋 <b>Выберите задание:</b>\n\n"
+        "🟢 - доступно\n"
+        "🔴 - недоступно\n"
+        "✅ - одноразовое\n"
+        "🔄 - ежедневное\n\n"
+        "Нажмите на задание, которое хотите отправить на проверку:",
         parse_mode='HTML',
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
+    return USER_SELECT_TASK
 
 # ФУНКЦИИ ДЛЯ РЕДАКТИРОВАНИЯ ID
 
@@ -2249,26 +2403,7 @@ async def admin_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=get_admin_keyboard()
     )
     return ConversationHandler.END
-async def admin_create_task_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Завершение создания задания — установка описания и запрос баллов"""
-    text = update.message.text
-    if text == "🔙 Отмена":
-        await update.message.reply_text(
-            "❌ Создание задания отменено.",
-            reply_markup=get_admin_keyboard()
-        )
-        return ConversationHandler.END
 
-    # Сохраняем описание задания
-    context.user_data['task_description'] = text
-    await update.message.reply_text(
-        f"📝 <b>Описание задания:</b>\n{text}\n"
-        "Теперь введите количество баллов за выполнение этого задания:",
-        parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
-    )
-    return ADMIN_SET_TASK_POINTS
-    
 def main():
     """Запуск бота"""
     TOKEN = '8549336941:AAHUqok5bUKTypT-X8UGtXdkih8CDTNnHJ4'
@@ -2315,8 +2450,10 @@ def main():
     admin_task_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex('^📝 Создать задание$'), admin_create_task_start)],
         states={
-            ADMIN_CREATE_TASK: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_task_finish)],
-            ADMIN_SET_TASK_POINTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_task_points)]
+            ADMIN_CREATE_TASK_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_task_title)],
+            ADMIN_CREATE_TASK: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_task_description)],
+            ADMIN_SET_TASK_POINTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_set_task_points)],
+            ADMIN_CREATE_TASK_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_task_type)]
         },
         fallbacks=[CommandHandler('cancel', admin_cancel)]
     )
@@ -2396,34 +2533,3 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 if __name__ == '__main__':
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
