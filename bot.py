@@ -45,31 +45,35 @@ ADMIN_CREATE_TASK_TITLE = 8
 ADMIN_CREATE_TASK_TYPE = 9
 
 # Файлы для хранения данных
-DATA_FILE = 'users_data.json'
-TASKS_FILE = 'tasks_data.json'
-SUBMISSIONS_FILE = 'submissions_data.json'
-PRODUCTS_FILE = 'products_data.json'
-ORDERS_FILE = 'orders_data.json'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_FILE = os.path.join(BASE_DIR, 'users_data.json')
+TASKS_FILE = os.path.join(BASE_DIR, 'tasks_data.json')
+SUBMISSIONS_FILE = os.path.join(BASE_DIR, 'submissions_data.json')
+PRODUCTS_FILE = os.path.join(BASE_DIR, 'products_data.json')
+ORDERS_FILE = os.path.join(BASE_DIR, 'orders_data.json')
 
-# ID администратора (замените на ваш Telegram ID)
-ADMIN_IDS = [424081501,421897893]  # Замените на ваш реальный ID
+# ID администратора (замените на ваши Telegram ID)
+ADMIN_IDS = [424081501, 421897893]  # Два администратора
 
+def initialize_files():
+    """Создание файлов если их нет"""
+    files = [DATA_FILE, TASKS_FILE, PRODUCTS_FILE, SUBMISSIONS_FILE, ORDERS_FILE]
+    for file in files:
+        if not os.path.exists(file):
+            save_data({}, file)
+            logger.info(f"Создан файл: {file}")
 
 def load_products():
     return load_data(PRODUCTS_FILE)
 
-
 def save_products(products):
     save_data(products, PRODUCTS_FILE)
-
 
 def load_orders():
     return load_data(ORDERS_FILE)
 
-
 def save_orders(orders):
     save_data(orders, ORDERS_FILE)
-
 
 def generate_product_id(products):
     """Генерация уникального ID для товара"""
@@ -114,39 +118,32 @@ def load_data(filename):
         logger.error(f"Ошибка загрузки данных из {filename}: {e}")
         return {}
 
-
 def save_data(data, filename):
     """Сохранение данных в файл"""
     try:
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+        logger.info(f"✅ Данные успешно сохранены в {filename}")
     except Exception as e:
-        logger.error(f"Ошибка сохранения данных в {filename}: {e}")
-
+        logger.error(f"❌ Ошибка сохранения данных в {filename}: {e}")
 
 def load_users():
     return load_data(DATA_FILE)
 
-
 def save_users(users):
     save_data(users, DATA_FILE)
-
 
 def load_tasks():
     return load_data(TASKS_FILE)
 
-
 def save_tasks(tasks):
     save_data(tasks, TASKS_FILE)
-
 
 def load_submissions():
     return load_data(SUBMISSIONS_FILE)
 
-
 def save_submissions(submissions):
     save_data(submissions, SUBMISSIONS_FILE)
-
 
 def get_main_keyboard(user_id=None):
     """Главная клавиатура с кнопками"""
@@ -176,7 +173,6 @@ def get_admin_keyboard():
 def is_admin(user_id):
     """Проверка, является ли пользователь администратором"""
     return user_id in ADMIN_IDS
-
 
 def generate_unique_id(items):
     """Генерация уникального ID"""
@@ -208,7 +204,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"👤 Имя: {user_data['first_name']} {user_data['surname']}\n"
             f"🆔 Ваш ID: #{user_data['unique_id']}\n\n"
             f"Используйте кнопки ниже для работы с ботом.",
-            reply_markup=get_main_keyboard(user_id)  # Передаем user_id для проверки админа
+            reply_markup=get_main_keyboard(user_id)
         )
         return ConversationHandler.END
     else:
@@ -218,7 +214,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📝 Пожалуйста, введите ваше имя:"
         )
         return WAITING_FOR_FIRST_NAME
-
 
 async def register_first_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка ввода имени при регистрации"""
@@ -244,7 +239,6 @@ async def register_first_name(update: Update, context: ContextTypes.DEFAULT_TYPE
         "Теперь введите вашу фамилию:"
     )
     return WAITING_FOR_SURNAME
-
 
 async def register_surname(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка ввода фамилии при регистрации"""
@@ -281,7 +275,7 @@ async def register_surname(update: Update, context: ContextTypes.DEFAULT_TYPE):
     users[user_id] = {
         'first_name': first_name,
         'surname': surname,
-        'name': f"{first_name} {surname}",  # Сохраняем полное имя для обратной совместимости
+        'name': f"{first_name} {surname}",
         'unique_id': unique_id,
         'points': 0,
         'registered_at': update.message.date.isoformat()
@@ -304,7 +298,6 @@ async def register_surname(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop('first_name', None)
     
     return ConversationHandler.END
-
 
 async def show_rating(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показать рейтинг участников"""
@@ -344,14 +337,12 @@ async def show_rating(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif index == 3:
             medal = "🥉 "
 
-        # Используем полное имя из отдельных полей
         user_name = f"{user_data['first_name']} {user_data['surname']}"
 
         rating_text += (
             f"{medal}<b>{index}.</b> {user_name} - {user_data['points']} баллов\n"
         )
 
-        # Добавляем разделитель каждые 5 участников
         if index % 5 == 0 and index < len(sorted_users):
             rating_text += "────────────────────\n"
 
@@ -384,7 +375,6 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_data = users[user_id]
 
-    # Используем отдельные поля имени и фамилии
     profile_text = (
         "👤 <b>Ваш профиль</b>\n\n"
         f"📝 Имя: {user_data['first_name']}\n"
@@ -399,7 +389,6 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode='HTML',
         reply_markup=get_main_keyboard(update.effective_user.id)
     )
-
 
 async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показать магазин товаров"""
@@ -556,7 +545,6 @@ async def buy_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     return USER_CONFIRM_PURCHASE
 
-
 async def confirm_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка подтверждения покупки"""
     text = update.message.text
@@ -655,8 +643,7 @@ async def confirm_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Уведомляем администраторов
     for admin_id in ADMIN_IDS:
         try:
-            remaining = "∞" if product.get('quantity', 0) == 0 else product.get('quantity', 0) - products[product_id][
-                'sold']
+            remaining = "∞" if product.get('quantity', 0) == 0 else product.get('quantity', 0) - products[product_id]['sold']
             await context.bot.send_message(
                 chat_id=admin_id,
                 text=f"🛒 <b>Новая покупка!</b>\n\n"
@@ -671,8 +658,7 @@ async def confirm_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error(f"Не удалось отправить уведомление администратору {admin_id}: {e}")
 
-    remaining_text = "∞" if product.get('quantity', 0) == 0 else product.get('quantity', 0) - products[product_id][
-        'sold']
+    remaining_text = "∞" if product.get('quantity', 0) == 0 else product.get('quantity', 0) - products[product_id]['sold']
 
     await update.message.reply_text(
         f"🎉 <b>Поздравляем с покупкой!</b>\n\n"
@@ -768,7 +754,6 @@ async def admin_create_product_name(update: Update, context: ContextTypes.DEFAUL
 
     return ADMIN_CREATE_PRODUCT_DESCRIPTION
 
-
 async def admin_create_product_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка описания товара"""
     text = update.message.text
@@ -850,7 +835,7 @@ async def handle_confirm_delete_task_callback(update: Update, context: ContextTy
         del tasks[task_id]
         save_tasks(tasks)
 
-        # Опционально: удаляем все связанные отправки (submissions)
+        # Удаляем все связанные отправки
         submissions = load_submissions()
         to_delete = [sid for sid, sub in submissions.items() if sub.get('task_id') == task_id]
         for sid in to_delete:
@@ -903,7 +888,6 @@ async def admin_create_product_price(update: Update, context: ContextTypes.DEFAU
 
     return ADMIN_SET_PRODUCT_QUANTITY
 
-
 async def admin_set_product_quantity(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Установка количества товара и сохранение"""
     text = update.message.text
@@ -948,7 +932,7 @@ async def admin_set_product_quantity(update: Update, context: ContextTypes.DEFAU
         'description': product_description,
         'price': product_price,
         'quantity': quantity,
-        'sold': 0,  # Количество проданных товаров
+        'sold': 0,
         'created_at': datetime.now().isoformat(),
         'created_by': update.effective_user.id
     }
@@ -974,7 +958,6 @@ async def admin_set_product_quantity(update: Update, context: ContextTypes.DEFAU
     )
 
     return ConversationHandler.END
-
 
 async def admin_delete_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Удаление товара с inline кнопками"""
@@ -1010,7 +993,6 @@ async def admin_delete_product(update: Update, context: ContextTypes.DEFAULT_TYP
         parse_mode='HTML',
         reply_markup=reply_markup
     )
-
 
 async def handle_delete_product_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка callback для удаления товара"""
@@ -1064,7 +1046,6 @@ async def handle_delete_product_callback(update: Update, context: ContextTypes.D
             reply_markup=reply_markup
         )
 
-
 async def handle_confirm_delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка подтверждения удаления товара"""
     query = update.callback_query
@@ -1098,7 +1079,6 @@ async def handle_confirm_delete_callback(update: Update, context: ContextTypes.D
             f"Товар больше не доступен для покупки.",
             parse_mode='HTML'
         )
-
 
 async def handle_delete_cancel_final(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка окончательной отмены удаления"""
@@ -1153,9 +1133,8 @@ async def admin_review_submission(update: Update, context: ContextTypes.DEFAULT_
     """Просмотр выбранного задания для оценки"""
     text = update.message.text
     if text == "🔙 Назад":
-        # Возвращаем к списку заданий, а не сразу в меню администратора
         return await admin_pending_submissions(update, context)
-    # Извлекаем ID отправки из текста
+    
     try:
         submission_id = text.split('#')[1].split(' - ')[0]
     except (IndexError, ValueError):
@@ -1164,6 +1143,7 @@ async def admin_review_submission(update: Update, context: ContextTypes.DEFAULT_
             reply_markup=get_admin_keyboard()
         )
         return ConversationHandler.END
+        
     submissions = load_submissions()
     if submission_id not in submissions:
         await update.message.reply_text(
@@ -1171,8 +1151,9 @@ async def admin_review_submission(update: Update, context: ContextTypes.DEFAULT_
             reply_markup=get_admin_keyboard()
         )
         return ConversationHandler.END
+        
     submission = submissions[submission_id]
-    # Создаем клавиатуру для оценки
+    
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("✅ Принять", callback_data=f"approve_{submission_id}"),
@@ -1188,14 +1169,14 @@ async def admin_review_submission(update: Update, context: ContextTypes.DEFAULT_
         f"📎 <b>Тип ответа:</b> {submission['content_type']}\n"
         f"🕒 <b>Время отправки:</b> {submission['submission_time'][:16]}"
     )
-    # Добавляем содержание в зависимости от типа контента
+    
     if submission['content_type'] == 'text' and submission['content']:
         submission_info += f"\n📝 <b>Ответ:</b>\n{submission['content']}"
     elif submission['content_type'] in ['photo', 'document', 'video'] and submission['content']:
         submission_info += f"\n📎 <b>Файл:</b> {submission['content']}"
-    # Убираем кнопки и оставляем только "Назад"
+        
     back_keyboard = ReplyKeyboardMarkup([[KeyboardButton("🔙 Назад")]], resize_keyboard=True)
-    # Отправляем сообщение с медиа или текстом
+    
     if submission['content_type'] == 'photo' and submission['file_id']:
         await context.bot.send_photo(
             chat_id=update.effective_chat.id,
@@ -1226,13 +1207,12 @@ async def admin_review_submission(update: Update, context: ContextTypes.DEFAULT_
             parse_mode='HTML',
             reply_markup=keyboard
         )
-    # Отправляем отдельное сообщение с кнопкой "Назад"
+        
     await update.message.reply_text(
         "Используйте кнопки выше для оценки задания. Кнопка 'Назад' вернет к списку заданий:",
         reply_markup=back_keyboard
     )
     return ConversationHandler.END
-    # Убираем return ADMIN_REVIEW_SELECT. Функция завершается, и бот ожидает callback от inline-кнопок.
 
 async def handle_task_submission(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка отправленного задания"""
@@ -1297,14 +1277,13 @@ async def handle_task_submission(update: Update, context: ContextTypes.DEFAULT_T
     }
     save_submissions(submissions)
 
-    # Отправляем уведомление администраторам (БЕЗ КНОПОК)
+    # Отправляем уведомление администраторам
     for admin_id in ADMIN_IDS:
         try:
             admin_message = (
                 f"📨 <b>Новое задание на проверку!</b>\n\n 💡 <i>Для проверки перейдите в панель администратора → '📨 Проверка заданий'</i>"
             )
 
-            # Отправляем сообщение с медиа или текстом БЕЗ КНОПОК
             if content_type == "photo":
                 await context.bot.send_photo(
                     chat_id=admin_id,
@@ -1353,6 +1332,7 @@ async def handle_submission_callback(update: Update, context: ContextTypes.DEFAU
     action = data.split('_')[0]
     submissions = load_submissions()
     users = load_users()
+    
     if submission_id not in submissions:
         await query.edit_message_text("❌ Отправка не найдена.")
         return
@@ -1406,60 +1386,11 @@ async def handle_submission_callback(update: Update, context: ContextTypes.DEFAU
             parse_mode='HTML'
         )
 
-    # ✅ ЭТО ДОЛЖНО БЫТЬ ВНУТРИ ФУНКЦИИ!
     await query.message.reply_text(
         "✅ Задание обработано. Нажмите «📨 Проверка заданий» в меню, чтобы продолжить.",
         reply_markup=get_admin_keyboard()
     )
     return ConversationHandler.END
-
-async def admin_create_product_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Завершение создания товара - установка описания"""
-    text = update.message.text
-
-    if text == "🔙 Отмена":
-        await update.message.reply_text(
-            "❌ Добавление товара отменено.",
-            reply_markup=get_admin_keyboard()
-        )
-        return ConversationHandler.END
-
-    # Сохраняем название товара (это первое сообщение после названия)
-    context.user_data['product_name'] = text
-
-    await update.message.reply_text(
-        f"📦 <b>Название товара:</b>\n{text}\n\n"
-        "Теперь введите описание товара:",
-        parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
-    )
-
-    return ADMIN_SET_PRODUCT_PRICE
-async def show_pending_submissions_after_review(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
-    """Показать список заданий после принятия/отклонения"""
-    submissions = load_submissions()
-    pending_subs = {k: v for k, v in submissions.items() if v['status'] == 'pending'}
-    if not pending_subs:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="✅ Заданий на проверке нет.",
-            reply_markup=get_admin_keyboard()
-        )
-        return
-    # Создаем клавиатуру с заданиями на проверке
-    keyboard = []
-    for sub_id, submission in pending_subs.items():
-        keyboard.append([KeyboardButton(
-            f"#{sub_id} - {submission['user_name']} - {submission['task_description'][:30]}..."
-        )])
-    keyboard.append([KeyboardButton("🔙 Назад")])
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text="📨 <b>Задания на проверке:</b>\nВыберите задание для оценки:",
-        parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    )
-    # НЕ вызываем admin_pending_submissions здесь — это делает сам обработчик кнопки "📨 Проверка заданий"
 
 async def admin_pending_submissions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Список заданий на проверке с возможностью выбора"""
@@ -1568,7 +1499,7 @@ async def check_task_availability(user_id: str, task_id: str, task: dict) -> tup
                 submission_time = datetime.fromisoformat(submission['submission_time'])
                 time_diff = now - submission_time
                 
-                if time_diff.total_seconds() < 24 * 3600:  # 24 часа
+                if time_diff.total_seconds() < 24 * 3600:
                     hours_left = 24 - (time_diff.total_seconds() / 3600)
                     return False, (
                         f"⏰ Вы уже выполняли это задание сегодня!\n"
@@ -1871,7 +1802,6 @@ async def admin_fix_id_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     return ADMIN_FIX_ID_SELECT_USER
 
-
 async def admin_fix_id_select_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка выбора пользователя для смены ID"""
     text = update.message.text
@@ -1923,7 +1853,6 @@ async def admin_fix_id_select_user(update: Update, context: ContextTypes.DEFAULT
     )
 
     return ADMIN_FIX_ID_SET_NEW
-
 
 async def admin_fix_id_set_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Установка нового ID для пользователя"""
@@ -1985,7 +1914,6 @@ async def admin_fix_id_set_new(update: Update, context: ContextTypes.DEFAULT_TYP
 
     return ConversationHandler.END
 
-
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Панель администратора"""
     user_id = update.effective_user.id
@@ -2002,7 +1930,6 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode='HTML',
         reply_markup=get_admin_keyboard()
     )
-
 
 async def admin_users_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Список всех пользователей"""
@@ -2038,7 +1965,6 @@ async def admin_users_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=get_admin_keyboard()
     )
 
-
 async def admin_add_points_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начало процесса добавления баллов"""
     user_id = update.effective_user.id
@@ -2073,7 +1999,6 @@ async def admin_add_points_start(update: Update, context: ContextTypes.DEFAULT_T
     )
 
     return ADMIN_SELECT_USER
-
 
 async def admin_select_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка выбора пользователя"""
@@ -2127,7 +2052,6 @@ async def admin_select_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     return ADMIN_ADD_POINTS
-
 
 async def admin_add_points_finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Завершение добавления баллов"""
@@ -2201,7 +2125,6 @@ async def admin_add_points_finish(update: Update, context: ContextTypes.DEFAULT_
 
     return ConversationHandler.END
 
-
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Статистика для администратора"""
     user_id = update.effective_user.id
@@ -2238,7 +2161,6 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode='HTML',
         reply_markup=get_admin_keyboard()
     )
-
 
 async def admin_reset_users_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начало процесса сброса пользователей"""
@@ -2281,7 +2203,6 @@ async def admin_reset_users_start(update: Update, context: ContextTypes.DEFAULT_
 
     return ADMIN_CONFIRM_RESET
 
-
 async def admin_reset_users_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Подтверждение сброса пользователей"""
     text = update.message.text
@@ -2309,7 +2230,7 @@ async def admin_reset_users_confirm(update: Update, context: ContextTypes.DEFAUL
     # Сбрасываем пользователей
     save_users({})
 
-    # Также сбрасываем задания, отправки и заказы (опционально)
+    # Также сбрасываем задания, отправки и заказы
     save_tasks({})
     save_submissions({})
     save_orders({})
@@ -2380,7 +2301,6 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "📊 Статистика":
         await admin_stats(update, context)
 
-    # 🔽 Вот это добавьте:
     elif text == "🔙 Главное меню":
         await update.message.reply_text(
             "🔙 Вы вернулись в главное меню.",
@@ -2408,6 +2328,9 @@ def main():
     """Запуск бота"""
     TOKEN = '8549336941:AAHUqok5bUKTypT-X8UGtXdkih8CDTNnHJ4'
     application = Application.builder().token(TOKEN).build()
+
+    # Инициализация файлов при запуске
+    initialize_files()
 
     user_conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
@@ -2531,7 +2454,6 @@ def main():
 
     logger.info("Бот запущен!")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
+
 if __name__ == '__main__':
     main()
-
-
