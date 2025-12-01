@@ -617,10 +617,9 @@ async def confirm_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return ConversationHandler.END
 
-    # Списываем баллы
     # Списываем баллы из текущих (points), но total_earned остается неизменным
-users[user_id]['points'] -= product['price']
-save_users(users)
+    users[user_id]['points'] -= product['price']
+    save_users(users)
 
     # Обновляем количество товара
     if product.get('quantity', 0) > 0:
@@ -682,7 +681,7 @@ save_users(users)
     context.user_data.pop('selected_product_id', None)
 
     return ConversationHandler.END
-
+    
 async def admin_create_product_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начало создания товара"""
     user_id = update.effective_user.id
@@ -1345,15 +1344,14 @@ async def handle_submission_callback(update: Update, context: ContextTypes.DEFAU
     user_id = submission['user_id']
     
     if action == 'approve':
-    if user_id in users:
-        # Начисляем баллы
-        users[user_id]['points'] += submission['task_points']
-        # И добавляем к общему заработку
-        users[user_id]['total_earned'] += submission['task_points']
-        save_users(users)
-        submission['status'] = 'approved'
-        save_submissions(submissions)
-        # ... остальной код
+        if user_id in users:
+            # Начисляем баллы
+            users[user_id]['points'] += submission['task_points']
+            # И добавляем к общему заработку
+            users[user_id]['total_earned'] += submission['task_points']
+            save_users(users)
+            submission['status'] = 'approved'
+            save_submissions(submissions)
             try:
                 await context.bot.send_message(
                     chat_id=user_id,
@@ -1983,12 +1981,6 @@ async def admin_add_points_start(update: Update, context: ContextTypes.DEFAULT_T
 
     users = load_users()
     
-if telegram_id in users:
-    users[telegram_id]['points'] += points
-    # И добавляем к общему заработку
-    users[telegram_id]['total_earned'] += points
-    save_users(users)
-    # ... остальной код
     if not users:
         await update.message.reply_text(
             "📭 Пользователей пока нет.",
@@ -2104,6 +2096,8 @@ async def admin_add_points_finish(update: Update, context: ContextTypes.DEFAULT_
 
     if telegram_id in users:
         users[telegram_id]['points'] += points
+        # И добавляем к общему заработку
+        users[telegram_id]['total_earned'] += points
         save_users(users)
 
         new_points = users[telegram_id]['points']
@@ -2471,4 +2465,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
