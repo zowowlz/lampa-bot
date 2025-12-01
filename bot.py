@@ -43,6 +43,7 @@ ADMIN_DELETE_PRODUCT = 6
 ADMIN_SET_PRODUCT_QUANTITY = 7
 ADMIN_CREATE_TASK_TITLE = 8
 ADMIN_CREATE_TASK_TYPE = 9
+USER_SEND_MORE_FILES = 103
 
 # Файлы для хранения данных
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1169,47 +1170,49 @@ async def admin_review_submission(update: Update, context: ContextTypes.DEFAULT_
         f"👤 <b>Пользователь:</b> {submission['user_name']} (ID: #{submission['user_unique_id']})\n"
         f"🎯 <b>Задание:</b> {submission['task_description']}\n"
         f"⭐ <b>Баллы:</b> {submission['task_points']}\n"
-        f"📎 <b>Тип ответа:</b> {submission['content_type']}\n"
+        f"📎 <b>Файлов отправлено:</b> {len(submission.get('files', []))}\n"
         f"🕒 <b>Время отправки:</b> {submission['submission_time'][:16]}"
     )
     
-    if submission['content_type'] == 'text' and submission['content']:
-        submission_info += f"\n📝 <b>Ответ:</b>\n{submission['content']}"
-    elif submission['content_type'] in ['photo', 'document', 'video'] and submission['content']:
-        submission_info += f"\n📎 <b>Файл:</b> {submission['content']}"
+    if submission.get('text_content'):
+        submission_info += f"\n📝 <b>Текст ответа:</b>\n{submission['text_content'][:500]}" + ("..." if len(submission['text_content']) > 500 else "")
         
     back_keyboard = ReplyKeyboardMarkup([[KeyboardButton("🔙 Назад")]], resize_keyboard=True)
     
-    if submission['content_type'] == 'photo' and submission['file_id']:
-        await context.bot.send_photo(
-            chat_id=update.effective_chat.id,
-            photo=submission['file_id'],
-            caption=submission_info,
-            parse_mode='HTML',
-            reply_markup=keyboard
-        )
-    elif submission['content_type'] == 'document' and submission['file_id']:
-        await context.bot.send_document(
-            chat_id=update.effective_chat.id,
-            document=submission['file_id'],
-            caption=submission_info,
-            parse_mode='HTML',
-            reply_markup=keyboard
-        )
-    elif submission['content_type'] == 'video' and submission['file_id']:
-        await context.bot.send_video(
-            chat_id=update.effective_chat.id,
-            video=submission['file_id'],
-            caption=submission_info,
-            parse_mode='HTML',
-            reply_markup=keyboard
-        )
-    else:
-        await update.message.reply_text(
-            submission_info,
-            parse_mode='HTML',
-            reply_markup=keyboard
-        )
+    # Отправляем все файлы
+    files = submission.get('files', [])
+    for i, file_data in enumerate(files):
+        try:
+            if file_data['type'] == 'photo':
+                await context.bot.send_photo(
+                    chat_id=update.effective_chat.id,
+                    photo=file_data['file_id'],
+                    caption=f"📸 Фото {i+1}/{len(files)}" + (f": {file_data.get('caption', '')}" if file_data.get('caption') else ""),
+                    parse_mode='HTML'
+                )
+            elif file_data['type'] == 'document':
+                await context.bot.send_document(
+                    chat_id=update.effective_chat.id,
+                    document=file_data['file_id'],
+                    caption=f"📄 Документ {i+1}/{len(files)}" + (f": {file_data.get('caption', '')}" if file_data.get('caption') else ""),
+                    parse_mode='HTML'
+                )
+            elif file_data['type'] == 'video':
+                await context.bot.send_video(
+                    chat_id=update.effective_chat.id,
+                    video=file_data['file_id'],
+                    caption=f"🎥 Видео {i+1}/{len(files)}" + (f": {file_data.get('caption', '')}" if file_data.get('caption') else ""),
+                    parse_mode='HTML'
+                )
+        except Exception as e:
+            logger.error(f"Не удалось отправить файл {i+1} для проверки: {e}")
+    
+    # Отправляем информацию о задании
+    await update.message.reply_text(
+        submission_info,
+        parse_mode='HTML',
+        reply_markup=keyboard
+    )
         
     await update.message.reply_text(
         "Используйте кнопки выше для оценки задания. Кнопка 'Назад' вернет к списку заданий:",
@@ -1465,6 +1468,9 @@ async def submit_task_select(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return ConversationHandler.END
 
     context.user_data['selected_task'] = task_id
+    # Инициализируем список файлов
+    context.user_data['files'] = []
+    context.user_data['text_content'] = ""
 
     task_type = task.get('type', 'once')
     type_text = "одноразовое" if task_type == "once" else "ежедневное"
@@ -1475,12 +1481,16 @@ async def submit_task_select(update: Update, context: ContextTypes.DEFAULT_TYPE)
         f"📝 <b>Название:</b> {task.get('title', 'Без названия')}\n"
         f"📄 <b>Описание:</b> {task['description']}\n"
         f"⭐ <b>Награда:</b> {task['points']} баллов\n\n"
-        f"📎 Прикрепите файл, фото, видео или напишите текстовый ответ:",
+        f"📎 Вы можете прикрепить несколько файлов, фото, видео или написать текстовый ответ.\n"
+        f"Когда закончите, нажмите кнопку <b>✅ Завершить отправку</b>",
         parse_mode='HTML',
-        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
+        reply_markup=ReplyKeyboardMarkup([
+            [KeyboardButton("✅ Завершить отправку")],
+            [KeyboardButton("🔙 Отмена")]
+        ], resize_keyboard=True)
     )
     return USER_SEND_TASK_CONTENT
-
+    
 async def check_task_availability(user_id: str, task_id: str, task: dict) -> tuple:
     """Проверяет, может ли пользователь выполнить задание"""
     submissions = load_submissions()
@@ -1514,6 +1524,117 @@ async def check_task_availability(user_id: str, task_id: str, task: dict) -> tup
     
     return True, ""
 
+async def handle_task_content(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка контента задания (можно несколько файлов)"""
+    text = update.message.text
+
+    if text == "🔙 Отмена":
+        await update.message.reply_text("❌ Отправка задания отменена.", reply_markup=get_main_keyboard())
+        return ConversationHandler.END
+
+    if text == "✅ Завершить отправку":
+        # Проверяем, есть ли хотя бы что-то отправленное
+        files = context.user_data.get('files', [])
+        text_content = context.user_data.get('text_content', '')
+        
+        if not files and not text_content:
+            await update.message.reply_text(
+                "❌ Вы не отправили ни файлов, ни текста. Пожалуйста, отправьте хотя бы что-то или отмените отправку.",
+                reply_markup=ReplyKeyboardMarkup([
+                    [KeyboardButton("✅ Завершить отправку")],
+                    [KeyboardButton("🔙 Отмена")]
+                ], resize_keyboard=True)
+            )
+            return USER_SEND_TASK_CONTENT
+        
+        # Переходим к финальной отправке
+        return await finalize_task_submission(update, context)
+
+    user_id = str(update.effective_user.id)
+    users = load_users()
+    tasks = load_tasks()
+
+    if user_id not in users:
+        await update.message.reply_text(
+            "❌ Вы не зарегистрированы.",
+            reply_markup=get_main_keyboard()
+        )
+        return ConversationHandler.END
+
+    task_id = context.user_data.get('selected_task')
+    if not task_id or task_id not in tasks:
+        await update.message.reply_text(
+            "❌ Ошибка: задание не выбрано.",
+            reply_markup=get_main_keyboard()
+        )
+        return ConversationHandler.END
+
+    # Обрабатываем контент
+    files = context.user_data.get('files', [])
+    
+    # Обработка фото
+    if update.message.photo:
+        file_id = update.message.photo[-1].file_id
+        files.append({
+            'type': 'photo',
+            'file_id': file_id,
+            'caption': update.message.caption or ''
+        })
+        context.user_data['files'] = files
+        await update.message.reply_text(
+            f"✅ Фото добавлено. Отправлено файлов: {len(files)}\n"
+            f"Продолжайте отправлять файлы или нажмите <b>✅ Завершить отправку</b>",
+            parse_mode='HTML'
+        )
+        
+    # Обработка документа
+    elif update.message.document:
+        file_id = update.message.document.file_id
+        file_name = update.message.document.file_name
+        files.append({
+            'type': 'document',
+            'file_id': file_id,
+            'file_name': file_name,
+            'caption': update.message.caption or ''
+        })
+        context.user_data['files'] = files
+        await update.message.reply_text(
+            f"✅ Документ '{file_name}' добавлен. Отправлено файлов: {len(files)}\n"
+            f"Продолжайте отправлять файлы или нажмите <b>✅ Завершить отправку</b>",
+            parse_mode='HTML'
+        )
+        
+    # Обработка видео
+    elif update.message.video:
+        file_id = update.message.video.file_id
+        files.append({
+            'type': 'video',
+            'file_id': file_id,
+            'caption': update.message.caption or ''
+        })
+        context.user_data['files'] = files
+        await update.message.reply_text(
+            f"✅ Видео добавлено. Отправлено файлов: {len(files)}\n"
+            f"Продолжайте отправлять файлы или нажмите <b>✅ Завершить отправку</b>",
+            parse_mode='HTML'
+        )
+        
+    # Обработка текста
+    elif update.message.text and text not in ["✅ Завершить отправку", "🔙 Отмена"]:
+        text_content = context.user_data.get('text_content', '')
+        if text_content:
+            text_content += "\n\n" + text
+        else:
+            text_content = text
+        context.user_data['text_content'] = text_content
+        await update.message.reply_text(
+            f"✅ Текст добавлен. Длина: {len(text_content)} символов.\n"
+            f"Продолжайте отправлять текст или файлы, или нажмите <b>✅ Завершить отправку</b>",
+            parse_mode='HTML'
+        )
+
+    return USER_SEND_TASK_CONTENT
+
 async def admin_create_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начало создания задания"""
     user_id = update.effective_user.id
@@ -1532,7 +1653,135 @@ async def admin_create_task_start(update: Update, context: ContextTypes.DEFAULT_
         reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Отмена")]], resize_keyboard=True)
     )
     return ADMIN_CREATE_TASK_TITLE
+    
+async def finalize_task_submission(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Финальная отправка задания со всеми файлами"""
+    user_id = str(update.effective_user.id)
+    users = load_users()
+    tasks = load_tasks()
 
+    task_id = context.user_data.get('selected_task')
+    user_data = users[user_id]
+    task = tasks[task_id]
+    
+    files = context.user_data.get('files', [])
+    text_content = context.user_data.get('text_content', '')
+
+    # Сохраняем отправку задания
+    submissions = load_submissions()
+    submission_id = str(generate_task_id(submissions))
+
+    # Определяем тип контента
+    if files:
+        content_type = "multiple_files"
+        if len(files) == 1:
+            content_type = files[0]['type']
+    else:
+        content_type = "text"
+
+    submissions[submission_id] = {
+        'user_id': user_id,
+        'user_name': f"{user_data['first_name']} {user_data['surname']}",
+        'user_unique_id': user_data['unique_id'],
+        'task_id': task_id,
+        'task_title': task.get('title', 'Без названия'),
+        'task_description': task['description'],
+        'task_points': task['points'],
+        'task_type': task.get('type', 'once'),
+        'content_type': content_type,
+        'content': text_content,
+        'files': files,  # Сохраняем все файлы
+        'text_content': text_content,
+        'submission_time': datetime.now().isoformat(),
+        'status': 'pending'
+    }
+    save_submissions(submissions)
+
+    # Отправляем уведомление администраторам
+    for admin_id in ADMIN_IDS:
+        try:
+            admin_message = (
+                f"📨 <b>Новое задание на проверку!</b>\n\n"
+                f"👤 Пользователь: {user_data['first_name']} {user_data['surname']} (ID: #{user_data['unique_id']})\n"
+                f"🎯 Задание: {task.get('title', 'Без названия')}\n"
+                f"📝 Описание: {task['description']}\n"
+                f"⭐ Баллы: {task['points']}\n"
+                f"📎 Файлов отправлено: {len(files)}\n"
+                f"📝 Текста символов: {len(text_content)}\n\n"
+                f"💡 <i>Для проверки перейдите в панель администратора → '📨 Проверка заданий'</i>"
+            )
+
+            # Отправляем все файлы по одному
+            for i, file_data in enumerate(files):
+                try:
+                    if file_data['type'] == 'photo':
+                        await context.bot.send_photo(
+                            chat_id=admin_id,
+                            photo=file_data['file_id'],
+                            caption=f"📸 Фото {i+1}/{len(files)}" + (f": {file_data['caption']}" if file_data.get('caption') else ""),
+                            parse_mode='HTML'
+                        )
+                    elif file_data['type'] == 'document':
+                        await context.bot.send_document(
+                            chat_id=admin_id,
+                            document=file_data['file_id'],
+                            caption=f"📄 Документ {i+1}/{len(files)}" + (f": {file_data['caption']}" if file_data.get('caption') else ""),
+                            parse_mode='HTML'
+                        )
+                    elif file_data['type'] == 'video':
+                        await context.bot.send_video(
+                            chat_id=admin_id,
+                            video=file_data['file_id'],
+                            caption=f"🎥 Видео {i+1}/{len(files)}" + (f": {file_data['caption']}" if file_data.get('caption') else ""),
+                            parse_mode='HTML'
+                        )
+                except Exception as e:
+                    logger.error(f"Не удалось отправить файл {i+1} администратору {admin_id}: {e}")
+
+            # Отправляем текстовое сообщение
+            if text_content:
+                await context.bot.send_message(
+                    chat_id=admin_id,
+                    text=admin_message + f"\n\n📝 <b>Текст ответа:</b>\n{text_content[:1000]}" + ("..." if len(text_content) > 1000 else ""),
+                    parse_mode='HTML'
+                )
+            else:
+                await context.bot.send_message(
+                    chat_id=admin_id,
+                    text=admin_message,
+                    parse_mode='HTML'
+                )
+
+        except Exception as e:
+            logger.error(f"Не удалось отправить уведомление администратору {admin_id}: {e}")
+
+    # Показываем подтверждение пользователю
+    confirmation_text = (
+        f"✅ <b>Задание успешно отправлено на проверку!</b>\n\n"
+        f"🎯 Задание: {task.get('title', 'Без названия')}\n"
+        f"📎 Отправлено файлов: {len(files)}\n"
+    )
+    
+    if text_content:
+        confirmation_text += f"📝 Текст ответа: {len(text_content)} символов\n"
+    
+    confirmation_text += (
+        f"\nОжидайте решения администратора. Вы получите уведомление, когда задание будет проверено."
+    )
+
+    await update.message.reply_text(
+        confirmation_text,
+        parse_mode='HTML',
+        reply_markup=get_main_keyboard()
+    )
+
+    # Очищаем контекст
+    context.user_data.pop('selected_task', None)
+    context.user_data.pop('files', None)
+    context.user_data.pop('text_content', None)
+
+    return ConversationHandler.END
+    
 async def admin_create_task_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка названия задания"""
     text = update.message.text
@@ -2418,19 +2667,20 @@ def main():
 )
 
     user_task_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
-        states={
-            USER_SELECT_TASK: [
-                MessageHandler(filters.Regex('^🔙 Отмена$'), cancel),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_select)
-            ],
-            USER_SEND_TASK_CONTENT: [
-                MessageHandler(filters.Regex('^🔙 Отмена$'), cancel),
-                MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT, handle_task_submission)
-            ]
-        },
-        fallbacks=[CommandHandler('cancel', cancel)]
-    )
+    entry_points=[MessageHandler(filters.Regex('^📤 Отправить задание$'), submit_task_start)],
+    states={
+        USER_SELECT_TASK: [
+            MessageHandler(filters.Regex('^🔙 Отмена$'), cancel),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, submit_task_select)
+        ],
+        USER_SEND_TASK_CONTENT: [
+            MessageHandler(filters.Regex('^🔙 Отмена$'), cancel),
+            MessageHandler(filters.Regex('^✅ Завершить отправку$'), handle_task_content),
+            MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.TEXT, handle_task_content)
+        ]
+    },
+    fallbacks=[CommandHandler('cancel', cancel)]
+)
 
     application.add_handler(user_conv_handler)
     application.add_handler(admin_points_conv_handler)
@@ -2465,5 +2715,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
 
