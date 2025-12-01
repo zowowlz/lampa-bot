@@ -273,13 +273,14 @@ async def register_surname(update: Update, context: ContextTypes.DEFAULT_TYPE):
     unique_id = generate_unique_id(users)
 
     users[user_id] = {
-        'first_name': first_name,
-        'surname': surname,
-        'name': f"{first_name} {surname}",
-        'unique_id': unique_id,
-        'points': 0,
-        'registered_at': update.message.date.isoformat()
-    }
+    'first_name': first_name,
+    'surname': surname,
+    'name': f"{first_name} {surname}",
+    'unique_id': unique_id,
+    'points': 0,           # Текущие баллы (списываются при покупках)
+    'total_earned': 0,     # Всего заработано (не списывается, только начисляется)
+    'registered_at': update.message.date.isoformat()
+}
     save_users(users)
 
     logger.info(f"Зарегистрирован новый пользователь: {first_name} {surname} (ID: {unique_id})")
@@ -319,14 +320,14 @@ async def show_rating(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Сортируем пользователей по количеству баллов (от большего к меньшему)
+    # Сортируем пользователей по total_earned (всего заработано)
     sorted_users = sorted(
         users.items(),
-        key=lambda x: x[1]['points'],
+        key=lambda x: x[1]['total_earned'],  # Изменено с 'points' на 'total_earned'
         reverse=True
     )
 
-    rating_text = "📊 <b>Рейтинг участников</b>\n\n"
+    rating_text = "📊 <b>Рейтинг участников (общий заработок)</b>\n\n"
 
     for index, (user_telegram_id, user_data) in enumerate(sorted_users, 1):
         medal = ""
@@ -340,7 +341,7 @@ async def show_rating(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_name = f"{user_data['first_name']} {user_data['surname']}"
 
         rating_text += (
-            f"{medal}<b>{index}.</b> {user_name} - {user_data['points']} баллов\n"
+            f"{medal}<b>{index}.</b> {user_name} - {user_data['total_earned']} баллов\n"
         )
 
         if index % 5 == 0 and index < len(sorted_users):
@@ -348,13 +349,14 @@ async def show_rating(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Добавляем статистику
     total_users = len(users)
-    total_points = sum(user['points'] for user in users.values())
+    # Считаем по total_earned
+    total_points = sum(user['total_earned'] for user in users.values())
     average_points = total_points / total_users if total_users > 0 else 0
 
     rating_text += f"\n📈 <b>Статистика:</b>\n"
     rating_text += f"👥 Всего участников: {total_users}\n"
-    rating_text += f"⭐ Всего баллов: {total_points}\n"
-    rating_text += f"📊 Средний балл: {average_points:.1f}"
+    rating_text += f"⭐ Всего заработано: {total_points}\n"
+    rating_text += f"📊 Средний заработок: {average_points:.1f}"
 
     await update.message.reply_text(
         rating_text,
@@ -380,7 +382,8 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📝 Имя: {user_data['first_name']}\n"
         f"📝 Фамилия: {user_data['surname']}\n"
         f"🆔 Уникальный ID: #{user_data['unique_id']}\n"
-        f"⭐ Баллы: {user_data['points']}\n"
+        f"💰 Текущие баллы: {user_data['points']}\n"
+        f"⭐ Всего заработано: {user_data['total_earned']}\n"
         f"📅 Зарегистрирован: {user_data.get('registered_at', 'Неизвестно')}"
     )
 
@@ -389,7 +392,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode='HTML',
         reply_markup=get_main_keyboard(update.effective_user.id)
     )
-
+    
 async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показать магазин товаров"""
     user_id = str(update.effective_user.id)
@@ -615,8 +618,9 @@ async def confirm_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     # Списываем баллы
-    users[user_id]['points'] -= product['price']
-    save_users(users)
+    # Списываем баллы из текущих (points), но total_earned остается неизменным
+users[user_id]['points'] -= product['price']
+save_users(users)
 
     # Обновляем количество товара
     if product.get('quantity', 0) > 0:
@@ -1341,11 +1345,15 @@ async def handle_submission_callback(update: Update, context: ContextTypes.DEFAU
     user_id = submission['user_id']
     
     if action == 'approve':
-        if user_id in users:
-            users[user_id]['points'] += submission['task_points']
-            save_users(users)
-            submission['status'] = 'approved'
-            save_submissions(submissions)
+    if user_id in users:
+        # Начисляем баллы
+        users[user_id]['points'] += submission['task_points']
+        # И добавляем к общему заработку
+        users[user_id]['total_earned'] += submission['task_points']
+        save_users(users)
+        submission['status'] = 'approved'
+        save_submissions(submissions)
+        # ... остальной код
             try:
                 await context.bot.send_message(
                     chat_id=user_id,
@@ -1974,7 +1982,13 @@ async def admin_add_points_start(update: Update, context: ContextTypes.DEFAULT_T
         return ConversationHandler.END
 
     users = load_users()
-
+    
+if telegram_id in users:
+    users[telegram_id]['points'] += points
+    # И добавляем к общему заработку
+    users[telegram_id]['total_earned'] += points
+    save_users(users)
+    # ... остальной код
     if not users:
         await update.message.reply_text(
             "📭 Пользователей пока нет.",
@@ -2457,3 +2471,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
